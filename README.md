@@ -26,7 +26,7 @@
 
 ---
 
-### 1.2 Установка PostgreSQL
+### 1.2 Установка PostgreSQL (без VPN на компе)
 
     sudo apt install postgresql
 
@@ -38,7 +38,7 @@
 
 ---
 
-### 1.3 Установка JavaFX
+### 1.3 Установка JavaFX (без VPN на компе)
 
     sudo apt install openjfx
 
