@@ -10,6 +10,7 @@
 
     sudo nano /etc/apt/sources.list
 должно быть так:
+<img width="1298" height="267" alt="Снимок экрана 2026-04-04 в 08 08 17" src="https://github.com/user-attachments/assets/41a0142e-0d8e-4d4a-82f5-285ae4f7a31d" />
 
 Раскомментировать нужные строки, затем (без VPN на компе):
 
