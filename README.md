@@ -44,7 +44,7 @@
 
 ---
 
-### 1.4 Установка Git и Maven
+### 1.4 Установка Git и Maven (без VPN на компе)
 
     sudo apt update
     sudo apt install git maven
