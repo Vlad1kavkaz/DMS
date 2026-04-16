@@ -117,7 +117,7 @@ public class SatelliteInfoPane extends VBox {
         );
 
         buttonBox.setLayoutX(-345);
-        buttonBox.layoutYProperty().bind(heightProperty().subtract(90));
+        buttonBox.layoutYProperty().bind(heightProperty().subtract(75));
 
         disableActions(true);
 

@@ -107,9 +107,9 @@ public class OrbitMapView extends BorderPane {
         clip.heightProperty().bind(mapPane.heightProperty());
         mapPane.setClip(clip);
 
-        infoPane.setPrefWidth(250);
-        infoPane.setMinWidth(250);
-        infoPane.setMaxWidth(250);
+        infoPane.setPrefWidth(320);
+        infoPane.setMinWidth(320);
+        infoPane.setMaxWidth(320);
 
         infoPane.setOnEditSatellite(this::onEditSatellite);
         infoPane.setOnManagePayloads(this::onManagePayloads);
@@ -120,8 +120,8 @@ public class OrbitMapView extends BorderPane {
         setCenter(mapPane);
         setRight(infoPane);
         BorderPane.setAlignment(infoPane, Pos.TOP_LEFT);
-        BorderPane.setMargin(infoPane, new Insets(0, 0, 0, 0));
-        infoPane.setTranslateX(-120);
+        BorderPane.setMargin(infoPane, new Insets(0, 24, 0, 0));
+        infoPane.setTranslateX(-220);
         infoPane.setTranslateY(-16);
 
         Platform.runLater(this::drawMap);
