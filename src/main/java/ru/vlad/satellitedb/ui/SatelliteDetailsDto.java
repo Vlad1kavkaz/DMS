@@ -9,12 +9,26 @@ public class SatelliteDetailsDto {
 
     private final Satellite satellite;
     private final String seriesName;
+    private final String operatorName;
+    private final String ownerName;
+    private final String manufacturerName;
     private final String orbitType;
     private final List<Payload> payloads;
 
-    public SatelliteDetailsDto(Satellite satellite, String seriesName, String orbitType, List<Payload> payloads) {
+    public SatelliteDetailsDto(
+            Satellite satellite,
+            String seriesName,
+            String operatorName,
+            String ownerName,
+            String manufacturerName,
+            String orbitType,
+            List<Payload> payloads
+    ) {
         this.satellite = satellite;
         this.seriesName = seriesName;
+        this.operatorName = operatorName;
+        this.ownerName = ownerName;
+        this.manufacturerName = manufacturerName;
         this.orbitType = orbitType;
         this.payloads = payloads;
     }
@@ -25,6 +39,18 @@ public class SatelliteDetailsDto {
 
     public String getSeriesName() {
         return seriesName;
+    }
+
+    public String getOperatorName() {
+        return operatorName;
+    }
+
+    public String getOwnerName() {
+        return ownerName;
+    }
+
+    public String getManufacturerName() {
+        return manufacturerName;
     }
 
     public String getOrbitType() {

@@ -30,6 +30,8 @@ public class SatelliteService {
             "retired"
     );
 
+    private static final int MAX_PHOTO_SIZE_BYTES = 1024 * 1024;
+
     private final SatelliteDao satelliteDao = new SatelliteDao();
 
     public List<Satellite> getAllSatellites() {
@@ -41,11 +43,13 @@ public class SatelliteService {
     }
 
     public void createSatellite(Satellite satellite) {
+        normalizeSatellite(satellite);
         validateSatellite(satellite, false);
         satelliteDao.insert(satellite);
     }
 
     public void updateSatellite(Satellite satellite) {
+        normalizeSatellite(satellite);
         validateSatellite(satellite, true);
         satelliteDao.update(satellite);
     }
@@ -83,5 +87,32 @@ public class SatelliteService {
                 && satellite.getDecommissionDate().isBefore(satellite.getLaunchDate())) {
             throw new IllegalArgumentException("Дата списания не может быть раньше даты запуска");
         }
+
+        byte[] photo = satellite.getPhoto();
+        if (photo != null && photo.length > MAX_PHOTO_SIZE_BYTES) {
+            throw new IllegalArgumentException("Размер изображения слишком большой");
+        }
+    }
+
+    private void normalizeSatellite(Satellite satellite) {
+        satellite.setName(trimToNull(satellite.getName()));
+        satellite.setCode(trimToNull(satellite.getCode()));
+        satellite.setInternationalDesignator(trimToNull(satellite.getInternationalDesignator()));
+        satellite.setPurpose(normalizeLower(satellite.getPurpose()));
+        satellite.setStatus(normalizeLower(satellite.getStatus()));
+        satellite.setDescription(trimToNull(satellite.getDescription()));
+        satellite.setNotes(trimToNull(satellite.getNotes()));
+    }
+
+    private String normalizeLower(String value) {
+        return value == null ? null : value.trim().toLowerCase();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

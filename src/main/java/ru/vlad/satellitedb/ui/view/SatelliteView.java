@@ -7,17 +7,23 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import ru.vlad.satellitedb.model.Organization;
 import ru.vlad.satellitedb.model.Satellite;
 import ru.vlad.satellitedb.model.SatelliteSeries;
+import ru.vlad.satellitedb.service.OrganizationService;
 import ru.vlad.satellitedb.service.SatelliteSeriesService;
 import ru.vlad.satellitedb.service.SatelliteService;
 import ru.vlad.satellitedb.ui.UiTextUtil;
 import ru.vlad.satellitedb.ui.dialog.SatelliteFormDialog;
+import ru.vlad.satellitedb.util.SatelliteImageUtil;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -29,8 +35,12 @@ public class SatelliteView extends BorderPane {
 
     private final SatelliteService satelliteService = new SatelliteService();
     private final SatelliteSeriesService seriesService = new SatelliteSeriesService();
+    private final OrganizationService organizationService = new OrganizationService();
+
     private final TableView<Satellite> table = new TableView<>();
+
     private final Map<Integer, String> seriesNameCache = new HashMap<>();
+    private final Map<Integer, String> organizationNameCache = new HashMap<>();
 
     public SatelliteView() {
         setPadding(new Insets(16));
@@ -58,11 +68,44 @@ public class SatelliteView extends BorderPane {
         setCenter(table);
         setBottom(buttons);
 
-        loadSeriesCache();
+        loadCaches();
         loadData();
     }
 
     private void createColumns() {
+        TableColumn<Satellite, byte[]> photoCol = new TableColumn<>("Фото");
+        photoCol.setPrefWidth(110);
+        photoCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getPhoto()));
+        photoCol.setCellFactory(col -> new TableCell<>() {
+            private final ImageView imageView = new ImageView();
+            private final Label emptyLabel = new Label("Нет фото");
+
+            {
+                imageView.setFitWidth(90);
+                imageView.setFitHeight(54);
+                imageView.setPreserveRatio(true);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+
+            @Override
+            protected void updateItem(byte[] item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty) {
+                    setGraphic(null);
+                    return;
+                }
+
+                if (item == null || item.length == 0) {
+                    setGraphic(emptyLabel);
+                    return;
+                }
+
+                imageView.setImage(SatelliteImageUtil.toFxImage(item));
+                setGraphic(imageView);
+            }
+        });
+
         TableColumn<Satellite, Integer> idCol = new TableColumn<>("ID");
         idCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getId()));
 
@@ -79,6 +122,13 @@ public class SatelliteView extends BorderPane {
             return new ReadOnlyStringWrapper(value);
         });
 
+        TableColumn<Satellite, String> manufacturerCol = new TableColumn<>("Производитель");
+        manufacturerCol.setCellValueFactory(data -> {
+            Integer orgId = data.getValue().getManufacturerOrganizationId();
+            String value = orgId != null ? organizationNameCache.getOrDefault(orgId, "") : "";
+            return new ReadOnlyStringWrapper(value);
+        });
+
         TableColumn<Satellite, String> purposeCol = new TableColumn<>("Назначение");
         purposeCol.setCellValueFactory(data ->
                 new ReadOnlyStringWrapper(UiTextUtil.satellitePurpose(data.getValue().getPurpose()))
@@ -92,22 +142,41 @@ public class SatelliteView extends BorderPane {
         TableColumn<Satellite, LocalDate> launchDateCol = new TableColumn<>("Дата запуска");
         launchDateCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getLaunchDate()));
 
-        table.getColumns().addAll(idCol, nameCol, codeCol, seriesCol, purposeCol, statusCol, launchDateCol);
+        table.getColumns().addAll(
+                photoCol,
+                idCol,
+                nameCol,
+                codeCol,
+                seriesCol,
+                manufacturerCol,
+                purposeCol,
+                statusCol,
+                launchDateCol
+        );
     }
 
-    private void loadSeriesCache() {
+    private void loadCaches() {
         seriesNameCache.clear();
-        List<SatelliteSeries> seriesList = seriesService.getAll();
-        for (SatelliteSeries series : seriesList) {
+        for (SatelliteSeries series : seriesService.getAll()) {
             if (series.getId() != null) {
                 seriesNameCache.put(series.getId(), nullSafe(series.getName()));
+            }
+        }
+
+        organizationNameCache.clear();
+        for (Organization organization : organizationService.getAll()) {
+            if (organization.getId() != null) {
+                String displayName = organization.getShortName() != null && !organization.getShortName().isBlank()
+                        ? organization.getShortName()
+                        : nullSafe(organization.getName());
+                organizationNameCache.put(organization.getId(), displayName);
             }
         }
     }
 
     private void loadData() {
         try {
-            loadSeriesCache();
+            loadCaches();
             List<Satellite> satellites = satelliteService.getAllSatellites();
             table.setItems(FXCollections.observableArrayList(satellites));
         } catch (Exception e) {
@@ -192,6 +261,7 @@ public class SatelliteView extends BorderPane {
         copy.setManufacturerOrganizationId(source.getManufacturerOrganizationId());
         copy.setDescription(source.getDescription());
         copy.setNotes(source.getNotes());
+        copy.setPhoto(source.getPhoto());
         return copy;
     }
 

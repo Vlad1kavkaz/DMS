@@ -32,7 +32,8 @@ public class SatelliteDao {
                     ni_id_owner_organization,
                     ni_id_manufacturer_organization,
                     ct_description,
-                    ct_notes
+                    ct_notes,
+                    bt_photo
                 FROM sc_cogs.tb_satellite
                 ORDER BY ni_id_satellite
                 """;
@@ -71,7 +72,8 @@ public class SatelliteDao {
                     ni_id_owner_organization,
                     ni_id_manufacturer_organization,
                     ct_description,
-                    ct_notes
+                    ct_notes,
+                    bt_photo
                 FROM sc_cogs.tb_satellite
                 WHERE ni_id_satellite = ?
                 """;
@@ -110,8 +112,9 @@ public class SatelliteDao {
                     ni_id_owner_organization,
                     ni_id_manufacturer_organization,
                     ct_description,
-                    ct_notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ct_notes,
+                    bt_photo
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING ni_id_satellite
                 """;
 
@@ -151,6 +154,7 @@ public class SatelliteDao {
                     ni_id_manufacturer_organization = ?,
                     ct_description = ?,
                     ct_notes = ?,
+                    bt_photo = ?,
                     dt_updated_at = CURRENT_TIMESTAMP
                 WHERE ni_id_satellite = ?
                 """;
@@ -159,7 +163,7 @@ public class SatelliteDao {
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             fillStatement(statement, satellite);
-            statement.setInt(16, satellite.getId());
+            statement.setInt(17, satellite.getId());
 
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -199,6 +203,7 @@ public class SatelliteDao {
         satellite.setManufacturerOrganizationId((Integer) rs.getObject("ni_id_manufacturer_organization"));
         satellite.setDescription(rs.getString("ct_description"));
         satellite.setNotes(rs.getString("ct_notes"));
+        satellite.setPhoto(rs.getBytes("bt_photo"));
 
         return satellite;
     }
@@ -219,6 +224,7 @@ public class SatelliteDao {
         statement.setObject(13, satellite.getManufacturerOrganizationId());
         statement.setString(14, satellite.getDescription());
         statement.setString(15, satellite.getNotes());
+        statement.setBytes(16, satellite.getPhoto());
     }
 
     private java.time.LocalDate toLocalDate(Date date) {
