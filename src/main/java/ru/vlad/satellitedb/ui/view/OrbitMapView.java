@@ -3,6 +3,8 @@ package ru.vlad.satellitedb.ui.view;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.Cursor;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -15,6 +17,9 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Ellipse;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
 import javafx.scene.shape.Rectangle;
 import ru.vlad.satellitedb.model.CrossSatellitePayload;
 import ru.vlad.satellitedb.model.Organization;
@@ -38,6 +43,7 @@ import ru.vlad.satellitedb.ui.dialog.SatellitePayloadLinkDialog;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public class OrbitMapView extends BorderPane {
@@ -173,20 +179,73 @@ public class OrbitMapView extends BorderPane {
         Ellipse polarOrbit = buildPolarOrbitEllipse();
 
         if (!geoOrbits.isEmpty()) {
-            mapPane.getChildren().add(geoOrbit);
+            mapPane.getChildren().add(buildOrbitLayerPath(geoOrbit, false, "geostationary"));
         }
         if (!heoOrbits.isEmpty()) {
-            mapPane.getChildren().add(heoOrbit);
+            mapPane.getChildren().add(buildOrbitLayerPath(heoOrbit, false, "highly_elliptical"));
         }
         if (!polarOrbits.isEmpty()) {
-            mapPane.getChildren().add(polarOrbit);
+            mapPane.getChildren().add(buildOrbitLayerPath(polarOrbit, false, "polar"));
         }
 
         drawEarth();
 
+        if (!geoOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(geoOrbit, true, "geostationary"));
+        }
+        if (!heoOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(heoOrbit, true, "highly_elliptical"));
+        }
+        if (!polarOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(polarOrbit, true, "polar"));
+        }
+
         addSatellitesToGeoOrbit(geoOrbits, geoOrbit);
         addSatellitesToHeoOrbit(heoOrbits);
         addSatellitesToPolarOrbit(polarOrbits);
+    }
+
+    private Path buildOrbitLayerPath(Ellipse ellipse, boolean visibleLayer, String orbitType) {
+        Path path = new Path();
+        path.setFill(Color.TRANSPARENT);
+        path.setStroke(ORBIT_COLOR);
+        path.setStrokeWidth(2.2);
+        path.setMouseTransparent(true);
+
+        double cx = ellipse.getCenterX();
+        double cy = ellipse.getCenterY();
+        double rx = ellipse.getRadiusX();
+        double ry = ellipse.getRadiusY();
+        double rotationDeg = ellipse.getRotate();
+
+        boolean drawing = false;
+        for (double angle = 0; angle <= 360; angle += 0.1) {
+            double[] point = pointOnRotatedEllipse(cx, cy, rx, ry, angle, rotationDeg);
+            boolean pointVisible = isOrbitFrontLayerPoint(orbitType, angle, point[0], point[1]);
+
+            if (pointVisible == visibleLayer) {
+                if (!drawing) {
+                    path.getElements().add(new MoveTo(point[0], point[1]));
+                    drawing = true;
+                } else {
+                    path.getElements().add(new LineTo(point[0], point[1]));
+                }
+            } else {
+                drawing = false;
+            }
+        }
+
+        return path;
+    }
+
+    private boolean isOrbitFrontLayerPoint(String orbitType, double angleDeg, double x, double y) {
+        if ("highly_elliptical".equals(orbitType)) {
+            // Для ВЭО передней считаем правую полуветвь орбиты,
+            // чтобы она всегда шла поверх Земли, а левая уходила под Землю.
+            return Math.cos(Math.toRadians(angleDeg)) >= 0;
+        }
+
+        return isHiddenBehindEarth(x, y);
     }
 
     private Ellipse buildGeoOrbitEllipse() {
@@ -199,7 +258,7 @@ public class OrbitMapView extends BorderPane {
     }
 
     private Ellipse buildHeoOrbitEllipse() {
-        Ellipse ellipse = new Ellipse(centerX + 55, centerY + EARTH_VERTICAL_SHIFT, earthRadius + 8, earthRadius + 105);
+        Ellipse ellipse = new Ellipse(centerX - 45, centerY + EARTH_VERTICAL_SHIFT, earthRadius - 14, earthRadius + 105);
         ellipse.setFill(Color.TRANSPARENT);
         ellipse.setStroke(ORBIT_COLOR);
         ellipse.setStrokeWidth(2.2);
@@ -222,36 +281,18 @@ public class OrbitMapView extends BorderPane {
     private void drawEarth() {
         double earthCenterY = centerY + EARTH_VERTICAL_SHIFT + MAP_VERTICAL_SHIFT;
 
-        Circle ocean = new Circle(centerX, earthCenterY, earthRadius);
-        ocean.setFill(Color.web("#1e88d9"));
-        ocean.setStroke(Color.web("#0d4f7c"));
-        ocean.setStrokeWidth(2.5);
+        Image image = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/earth.png")));
 
-        Circle glow = new Circle(centerX - 18, earthCenterY - 18, earthRadius * 0.78);
-        glow.setFill(Color.web("#46b3ff"));
-        glow.setOpacity(0.18);
+        ImageView earthView = new ImageView(image);
+        earthView.setFitWidth(earthRadius * 2);
+        earthView.setFitHeight(earthRadius * 2);
+        earthView.setPreserveRatio(false);
+        earthView.setLayoutX(centerX - earthRadius);
+        earthView.setLayoutY(earthCenterY - earthRadius);
 
-        Ellipse continent1 = new Ellipse(centerX - 28, earthCenterY - 12, 22, 27);
-        continent1.setFill(Color.web("#12b886"));
-        continent1.setOpacity(0.85);
+        // No clipping, render the image directly
 
-        Ellipse continent2 = new Ellipse(centerX + 18, earthCenterY + 24, 19, 22);
-        continent2.setFill(Color.web("#0ca678"));
-        continent2.setOpacity(0.82);
-
-        Ellipse continent3 = new Ellipse(centerX + 8, earthCenterY - 34, 13, 15);
-        continent3.setFill(Color.web("#38d9a9"));
-        continent3.setOpacity(0.8);
-
-        Ellipse cloud1 = new Ellipse(centerX - 8, earthCenterY + 36, 26, 10);
-        cloud1.setFill(Color.WHITE);
-        cloud1.setOpacity(0.18);
-
-        Ellipse cloud2 = new Ellipse(centerX + 24, earthCenterY - 6, 18, 8);
-        cloud2.setFill(Color.WHITE);
-        cloud2.setOpacity(0.16);
-
-        mapPane.getChildren().addAll(glow, ocean, continent1, continent2, continent3, cloud1, cloud2);
+        mapPane.getChildren().add(earthView);
     }
 
     private void addSatellitesToGeoOrbit(List<Orbit> orbits, Ellipse orbitEllipse) {
@@ -274,13 +315,13 @@ public class OrbitMapView extends BorderPane {
             return;
         }
 
-        double rx = earthRadius + 8;
+        double rx = earthRadius - 14;
         double ry = earthRadius + 105;
         double rotationDeg = -18;
 
         for (int i = 0; i < orbits.size(); i++) {
             double angleDeg = distributeAngle(i, orbits.size(), 318, 42);
-            double[] point = findVisiblePointOnRotatedEllipse(centerX + 55, centerY + EARTH_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
+            double[] point = findVisiblePointOnRotatedEllipse(centerX - 45, centerY + EARTH_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
             addSatelliteVisuals(orbits.get(i), point[0], point[1], HEO_MARKER_COLOR, i, "highly_elliptical");
         }
     }
@@ -334,7 +375,7 @@ public class OrbitMapView extends BorderPane {
 
         Satellite satellite = satelliteService.getSatelliteById(orbit.getSatelliteId()).orElse(null);
         String satelliteName = satellite != null ? safe(satellite.getName()) : "Спутник-" + orbit.getSatelliteId();
-        String displayName = abbreviateLabel(satelliteName, 13);
+        String displayName = abbreviateLabel(satelliteName);
 
         Circle clickZone = new Circle(x, y, 22);
         clickZone.setFill(Color.TRANSPARENT);
@@ -644,17 +685,14 @@ public class OrbitMapView extends BorderPane {
         alert.showAndWait();
     }
 
-    private String abbreviateLabel(String value, int maxLength) {
+    private String abbreviateLabel(String value) {
         if (value == null) {
             return "-";
         }
-        if (maxLength < 4) {
+        if (value.length() < 13) {
             return value;
         }
-        if (value.length() < maxLength) {
-            return value;
-        }
-        return value.substring(0, maxLength - 3) + "...";
+        return value.substring(0, 13 - 3) + "...";
     }
 
     private String safe(String value) {
@@ -678,8 +716,8 @@ public class OrbitMapView extends BorderPane {
     private double[] findVisiblePointOnRotatedEllipse(double cx, double cy, double rx, double ry,
                                                       double preferredAngleDeg, double rotationDeg) {
         double[] directPoint = pointOnRotatedEllipse(cx, cy, rx, ry, preferredAngleDeg, rotationDeg);
-        if (!isHiddenBehindEarth(directPoint[0], directPoint[1])
-                && !isTooCloseToExistingMarker(directPoint[0], directPoint[1])) {
+        if (isHiddenBehindEarth(directPoint[0], directPoint[1])
+                && isTooCloseToExistingMarker(directPoint[0], directPoint[1])) {
             return directPoint;
         }
 
@@ -687,8 +725,8 @@ public class OrbitMapView extends BorderPane {
         for (double offset : offsets) {
             double candidateAngle = normalizeAngle(preferredAngleDeg + offset);
             double[] candidatePoint = pointOnRotatedEllipse(cx, cy, rx, ry, candidateAngle, rotationDeg);
-            if (!isHiddenBehindEarth(candidatePoint[0], candidatePoint[1])
-                    && !isTooCloseToExistingMarker(candidatePoint[0], candidatePoint[1])) {
+            if (isHiddenBehindEarth(candidatePoint[0], candidatePoint[1])
+                    && isTooCloseToExistingMarker(candidatePoint[0], candidatePoint[1])) {
                 return candidatePoint;
             }
         }
@@ -702,7 +740,7 @@ public class OrbitMapView extends BorderPane {
         double dy = y - earthCenterY;
         double safeRadius = earthRadius + 18;
 
-        return dx * dx + dy * dy <= safeRadius * safeRadius;
+        return !(dx * dx + dy * dy <= safeRadius * safeRadius);
     }
 
     private double[] pointOnEllipse(double cx, double cy, double rx, double ry, double angleDeg) {
@@ -712,8 +750,8 @@ public class OrbitMapView extends BorderPane {
 
     private double[] findVisiblePointOnEllipse(double cx, double cy, double rx, double ry, double preferredAngleDeg) {
         double[] directPoint = pointOnEllipse(cx, cy, rx, ry, preferredAngleDeg);
-        if (!isHiddenBehindEarth(directPoint[0], directPoint[1])
-                && !isTooCloseToExistingMarker(directPoint[0], directPoint[1])) {
+        if (isHiddenBehindEarth(directPoint[0], directPoint[1])
+                && isTooCloseToExistingMarker(directPoint[0], directPoint[1])) {
             return directPoint;
         }
 
@@ -721,8 +759,8 @@ public class OrbitMapView extends BorderPane {
         for (double offset : offsets) {
             double candidateAngle = normalizeAngle(preferredAngleDeg + offset);
             double[] candidatePoint = pointOnEllipse(cx, cy, rx, ry, candidateAngle);
-            if (!isHiddenBehindEarth(candidatePoint[0], candidatePoint[1])
-                    && !isTooCloseToExistingMarker(candidatePoint[0], candidatePoint[1])) {
+            if (isHiddenBehindEarth(candidatePoint[0], candidatePoint[1])
+                    && isTooCloseToExistingMarker(candidatePoint[0], candidatePoint[1])) {
                 return candidatePoint;
             }
         }
@@ -736,10 +774,10 @@ public class OrbitMapView extends BorderPane {
             double dx = x - center[0];
             double dy = y - center[1];
             if (dx * dx + dy * dy < minDistance * minDistance) {
-                return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private double[] resolveLabelPositionWithoutOverlap(double markerX, double markerY,
