@@ -93,6 +93,11 @@ public class OrbitMapView extends BorderPane {
 
         VBox topBox = new VBox(title, toolbar);
 
+        mapPane.setScaleX(0.8);
+        mapPane.setScaleY(0.8);
+        mapPane.setTranslateX(-90);
+        mapPane.setTranslateY(-55);
+
         mapPane.setPrefSize(940, 700);
         mapPane.setMinSize(820, 620);
         mapPane.setStyle("-fx-background-color: #f4f4f4;");
