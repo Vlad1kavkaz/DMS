@@ -1,6 +1,10 @@
 package ru.vlad.satellitedb.ui.view;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.Cursor;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -13,18 +17,18 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Ellipse;
-import javafx.scene.shape.Line;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.Shape;
 import ru.vlad.satellitedb.model.CrossSatellitePayload;
-import ru.vlad.satellitedb.model.GeoOrbit;
-import ru.vlad.satellitedb.model.HeoOrbit;
+import ru.vlad.satellitedb.model.Organization;
 import ru.vlad.satellitedb.model.Orbit;
 import ru.vlad.satellitedb.model.Payload;
-import ru.vlad.satellitedb.model.PolarOrbit;
 import ru.vlad.satellitedb.model.Satellite;
 import ru.vlad.satellitedb.model.SatelliteSeries;
 import ru.vlad.satellitedb.service.CrossSatellitePayloadService;
+import ru.vlad.satellitedb.service.OrganizationService;
 import ru.vlad.satellitedb.service.OrbitService;
 import ru.vlad.satellitedb.service.OrbitUiService;
 import ru.vlad.satellitedb.service.PayloadService;
@@ -38,26 +42,29 @@ import ru.vlad.satellitedb.ui.dialog.SatellitePayloadLinkDialog;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public class OrbitMapView extends BorderPane {
+
+    private static final Color ORBIT_COLOR = Color.web("#8f8f8f");
+    private static final Color GEO_MARKER_COLOR = Color.DARKORANGE;
+    private static final Color HEO_MARKER_COLOR = Color.MEDIUMPURPLE;
+    private static final Color POLAR_MARKER_COLOR = Color.FORESTGREEN;
+    private static final double EARTH_VERTICAL_SHIFT = -45;
+    private static final double MAP_VERTICAL_SHIFT = 100;
 
     private final SatelliteService satelliteService = new SatelliteService();
     private final OrbitService orbitService = new OrbitService();
     private final OrbitUiService orbitUiService = new OrbitUiService();
     private final CrossSatellitePayloadService linkService = new CrossSatellitePayloadService();
     private final PayloadService payloadService = new PayloadService();
+    private final SatelliteSeriesService seriesService = new SatelliteSeriesService();
+    private final OrganizationService organizationService = new OrganizationService();
 
     private final Pane mapPane = new Pane();
     private final SatelliteInfoPane infoPane = new SatelliteInfoPane();
-
-    private final Map<Integer, Shape> orbitShapes = new HashMap<>();
-    private Shape selectedOrbitShape;
-
-    private final SatelliteSeriesService seriesService = new SatelliteSeriesService();
 
     private double centerX;
     private double centerY;
@@ -66,6 +73,8 @@ public class OrbitMapView extends BorderPane {
     private Circle selectedMarker;
     private Orbit selectedOrbit;
     private Satellite selectedSatellite;
+    private final List<double[]> placedMarkerCenters = new ArrayList<>();
+    private final List<double[]> placedLabelBounds = new ArrayList<>();
 
     public OrbitMapView() {
         setPadding(new Insets(16));
@@ -84,13 +93,18 @@ public class OrbitMapView extends BorderPane {
 
         VBox topBox = new VBox(title, toolbar);
 
-        mapPane.setPrefSize(900, 680);
+        mapPane.setPrefSize(940, 700);
+        mapPane.setMinSize(820, 620);
         mapPane.setStyle("-fx-background-color: #f4f4f4;");
 
         Rectangle clip = new Rectangle();
         clip.widthProperty().bind(mapPane.widthProperty());
         clip.heightProperty().bind(mapPane.heightProperty());
         mapPane.setClip(clip);
+
+        infoPane.setPrefWidth(250);
+        infoPane.setMinWidth(250);
+        infoPane.setMaxWidth(250);
 
         infoPane.setOnEditSatellite(this::onEditSatellite);
         infoPane.setOnManagePayloads(this::onManagePayloads);
@@ -100,11 +114,12 @@ public class OrbitMapView extends BorderPane {
         setTop(topBox);
         setCenter(mapPane);
         setRight(infoPane);
+        BorderPane.setAlignment(infoPane, Pos.TOP_LEFT);
+        BorderPane.setMargin(infoPane, new Insets(0, 0, 0, 0));
+        infoPane.setTranslateX(-120);
+        infoPane.setTranslateY(-16);
 
-        mapPane.widthProperty().addListener((obs, oldVal, newVal) -> drawMap());
-        mapPane.heightProperty().addListener((obs, oldVal, newVal) -> drawMap());
-
-        drawMap();
+        Platform.runLater(this::drawMap);
     }
 
     private void updateGeometry() {
@@ -112,15 +127,16 @@ public class OrbitMapView extends BorderPane {
         double height = mapPane.getHeight();
 
         if (width <= 0) {
-            width = 900;
+            width = 940;
         }
         if (height <= 0) {
-            height = 680;
+            height = 700;
         }
 
-        centerX = width * 0.40;
-        centerY = height * 0.52;
-        earthRadius = Math.min(width, height) * 0.12;
+        // Специально сдвигаем карту влево, чтобы справа было место под карточку
+        centerX = width * 0.35;
+        centerY = height * 0.49;
+        earthRadius = Math.min(width, height) * 0.14;
     }
 
     private void drawMap() {
@@ -128,12 +144,12 @@ public class OrbitMapView extends BorderPane {
             updateGeometry();
 
             mapPane.getChildren().clear();
-            infoPane.clearInfo();
             selectedMarker = null;
             selectedOrbit = null;
             selectedSatellite = null;
-
-            drawEarth();
+            placedMarkerCenters.clear();
+            placedLabelBounds.clear();
+            infoPane.clearInfo();
 
             List<Orbit> allOrbits = orbitService.getAllOrbits().stream()
                     .sorted(Comparator.comparing(o -> o.getId() == null ? Integer.MAX_VALUE : o.getId()))
@@ -151,170 +167,215 @@ public class OrbitMapView extends BorderPane {
                     .filter(o -> "polar".equals(o.getOrbitType()))
                     .toList();
 
-            for (int i = 0; i < geoOrbits.size(); i++) {
-                drawGeoOrbit(geoOrbits.get(i), i, geoOrbits.size());
-            }
-
-            for (int i = 0; i < heoOrbits.size(); i++) {
-                drawHeoOrbit(heoOrbits.get(i), i, heoOrbits.size());
-            }
-
-            for (int i = 0; i < polarOrbits.size(); i++) {
-                drawPolarOrbit(polarOrbits.get(i), i, polarOrbits.size());
-            }
+            drawOrbitsAndSatellites(geoOrbits, heoOrbits, polarOrbits);
         } catch (Exception e) {
             showError("Ошибка построения карты орбит", e.getMessage());
         }
     }
 
+    private void drawOrbitsAndSatellites(List<Orbit> geoOrbits, List<Orbit> heoOrbits, List<Orbit> polarOrbits) {
+        Ellipse geoOrbit = buildGeoOrbitEllipse();
+        Ellipse heoOrbit = buildHeoOrbitEllipse();
+        Ellipse polarOrbit = buildPolarOrbitEllipse();
+
+        if (!geoOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(geoOrbit, false, "geostationary"));
+        }
+        if (!heoOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(heoOrbit, false, "highly_elliptical"));
+        }
+        if (!polarOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(polarOrbit, false, "polar"));
+        }
+
+        drawEarth();
+
+        if (!geoOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(geoOrbit, true, "geostationary"));
+        }
+        if (!heoOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(heoOrbit, true, "highly_elliptical"));
+        }
+        if (!polarOrbits.isEmpty()) {
+            mapPane.getChildren().add(buildOrbitLayerPath(polarOrbit, true, "polar"));
+        }
+
+        addSatellitesToGeoOrbit(geoOrbits, geoOrbit);
+        addSatellitesToHeoOrbit(heoOrbits);
+        addSatellitesToPolarOrbit(polarOrbits);
+    }
+
+    private Path buildOrbitLayerPath(Ellipse ellipse, boolean visibleLayer, String orbitType) {
+        Path path = new Path();
+        path.setFill(Color.TRANSPARENT);
+        path.setStroke(ORBIT_COLOR);
+        path.setStrokeWidth(2.2);
+        path.setMouseTransparent(true);
+
+        double cx = ellipse.getCenterX();
+        double cy = ellipse.getCenterY();
+        double rx = ellipse.getRadiusX();
+        double ry = ellipse.getRadiusY();
+        double rotationDeg = ellipse.getRotate();
+
+        boolean drawing = false;
+        for (double angle = 0; angle <= 360; angle += 0.1) {
+            double[] point = pointOnRotatedEllipse(cx, cy, rx, ry, angle, rotationDeg);
+            boolean pointVisible = isOrbitFrontLayerPoint(orbitType, angle, point[0], point[1]);
+
+            if (pointVisible == visibleLayer) {
+                if (!drawing) {
+                    path.getElements().add(new MoveTo(point[0], point[1]));
+                    drawing = true;
+                } else {
+                    path.getElements().add(new LineTo(point[0], point[1]));
+                }
+            } else {
+                drawing = false;
+            }
+        }
+
+        return path;
+    }
+
+    private boolean isOrbitFrontLayerPoint(String orbitType, double angleDeg, double x, double y) {
+        if ("highly_elliptical".equals(orbitType)) {
+            // Для ВЭО передней считаем правую полуветвь орбиты,
+            // чтобы она всегда шла поверх Земли, а левая уходила под Землю.
+            return Math.cos(Math.toRadians(angleDeg)) >= 0;
+        }
+
+        return isHiddenBehindEarth(x, y);
+    }
+
+    private Ellipse buildGeoOrbitEllipse() {
+        Ellipse ellipse = new Ellipse(centerX, centerY + MAP_VERTICAL_SHIFT, earthRadius + 185, earthRadius + 28);
+        ellipse.setFill(Color.TRANSPARENT);
+        ellipse.setStroke(ORBIT_COLOR);
+        ellipse.setStrokeWidth(2.2);
+        ellipse.setMouseTransparent(true);
+        return ellipse;
+    }
+
+    private Ellipse buildHeoOrbitEllipse() {
+        Ellipse ellipse = new Ellipse(centerX - 45, centerY + EARTH_VERTICAL_SHIFT, earthRadius - 14, earthRadius + 105);
+        ellipse.setFill(Color.TRANSPARENT);
+        ellipse.setStroke(ORBIT_COLOR);
+        ellipse.setStrokeWidth(2.2);
+        ellipse.setMouseTransparent(true);
+        ellipse.setRotate(-18);
+        return ellipse;
+    }
+
+    private Ellipse buildPolarOrbitEllipse() {
+        Ellipse ellipse = new Ellipse(centerX - 20, centerY + EARTH_VERTICAL_SHIFT - 15 + MAP_VERTICAL_SHIFT, earthRadius - 8, earthRadius + 38);
+        ellipse.setFill(Color.TRANSPARENT);
+        ellipse.setStroke(ORBIT_COLOR);
+        ellipse.setStrokeWidth(2.2);
+        ellipse.setMouseTransparent(true);
+        ellipse.setRotate(16);
+        return ellipse;
+    }
+
+
     private void drawEarth() {
-        Circle ocean = new Circle(centerX, centerY, earthRadius);
-        ocean.setFill(Color.web("#1e88d9"));
-        ocean.setStroke(Color.web("#0d4f7c"));
-        ocean.setStrokeWidth(2.5);
+        double earthCenterY = centerY + EARTH_VERTICAL_SHIFT + MAP_VERTICAL_SHIFT;
 
-        Circle glow = new Circle(centerX - 18, centerY - 18, earthRadius * 0.78);
-        glow.setFill(Color.web("#46b3ff"));
-        glow.setOpacity(0.18);
+        Image image = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/earth.png")));
 
-        Ellipse continent1 = new Ellipse(centerX - 28, centerY - 12, 22, 27);
-        continent1.setFill(Color.web("#12b886"));
-        continent1.setOpacity(0.85);
+        ImageView earthView = new ImageView(image);
+        earthView.setFitWidth(earthRadius * 2);
+        earthView.setFitHeight(earthRadius * 2);
+        earthView.setPreserveRatio(false);
+        earthView.setLayoutX(centerX - earthRadius);
+        earthView.setLayoutY(earthCenterY - earthRadius);
 
-        Ellipse continent2 = new Ellipse(centerX + 18, centerY + 24, 19, 22);
-        continent2.setFill(Color.web("#0ca678"));
-        continent2.setOpacity(0.82);
+        // No clipping, render the image directly
 
-        Ellipse continent3 = new Ellipse(centerX + 8, centerY - 34, 13, 15);
-        continent3.setFill(Color.web("#38d9a9"));
-        continent3.setOpacity(0.8);
-
-        Ellipse cloud1 = new Ellipse(centerX - 8, centerY + 36, 26, 10);
-        cloud1.setFill(Color.WHITE);
-        cloud1.setOpacity(0.18);
-
-        Ellipse cloud2 = new Ellipse(centerX + 24, centerY - 6, 18, 8);
-        cloud2.setFill(Color.WHITE);
-        cloud2.setOpacity(0.16);
-
-        mapPane.getChildren().addAll(glow, ocean, continent1, continent2, continent3, cloud1, cloud2);
+        mapPane.getChildren().add(earthView);
     }
 
-    private void drawGeoOrbit(Orbit orbit, int index, int total) {
-        GeoOrbit geo = orbitService.getGeoOrbitById(orbit.getId());
-        if (geo == null) {
+    private void addSatellitesToGeoOrbit(List<Orbit> orbits, Ellipse orbitEllipse) {
+        if (orbits.isEmpty()) {
             return;
         }
 
-        double orbitRadius = earthRadius + 110 + index * 18.0;
+        double rx = orbitEllipse.getRadiusX();
+        double ry = orbitEllipse.getRadiusY();
 
-        Circle orbitCircle = new Circle(centerX, centerY, orbitRadius);
-        orbitCircle.setFill(Color.TRANSPARENT);
-        orbitCircle.setStroke(Color.web("#8b8b8b"));
-        orbitCircle.setStrokeWidth(2);
-        orbitCircle.setMouseTransparent(true);
-
-        double baseLongitude = geo.getStationLongitudeDeg() != null ? geo.getStationLongitudeDeg() : 0.0;
-        double spread = total > 1 ? (index - (total - 1) / 2.0) * 10.0 : 0.0;
-        double angle = Math.toRadians(normalizeLongitude(baseLongitude + spread));
-
-        double satX = centerX + orbitRadius * Math.cos(angle);
-        double satY = centerY + orbitRadius * Math.sin(angle);
-
-        Line redLine = new Line(
-                satX, satY,
-                centerX + earthRadius * Math.cos(angle),
-                centerY + earthRadius * Math.sin(angle)
-        );
-        redLine.setStroke(Color.RED);
-        redLine.setStrokeWidth(1.5);
-        redLine.setMouseTransparent(true);
-
-        mapPane.getChildren().addAll(orbitCircle, redLine);
-        addSatelliteVisuals(orbit, satX, satY, Color.DARKORANGE, index, "geostationary");
-
-        orbitShapes.put(orbit.getId(), orbitCircle);
+        for (int i = 0; i < orbits.size(); i++) {
+            double angleDeg = distributeAngle(i, orbits.size(), 204, 336);
+            double[] point = findVisiblePointOnEllipse(centerX, centerY + MAP_VERTICAL_SHIFT, rx, ry, angleDeg);
+            addSatelliteVisuals(orbits.get(i), point[0], point[1], GEO_MARKER_COLOR, i, "geostationary");
+        }
     }
 
-    private void drawHeoOrbit(Orbit orbit, int index, int total) {
-        HeoOrbit heo = orbitService.getHeoOrbitById(orbit.getId());
-        if (heo == null) {
+    private void addSatellitesToHeoOrbit(List<Orbit> orbits) {
+        if (orbits.isEmpty()) {
             return;
         }
 
-        double radiusX = earthRadius + 210 + index * 14.0;
-        double radiusY = earthRadius + 40 + index * 8.0;
-        double ellipseCenterX = centerX + 70;
-        double ellipseCenterY = centerY;
+        double rx = earthRadius - 14;
+        double ry = earthRadius + 105;
+        double rotationDeg = -18;
 
-        Ellipse ellipse = new Ellipse(ellipseCenterX, ellipseCenterY, radiusX, radiusY);
-        ellipse.setFill(Color.TRANSPARENT);
-        ellipse.setStroke(Color.web("#a0a0a0"));
-        ellipse.setStrokeWidth(2);
-        ellipse.setMouseTransparent(true);
-
-        double baseAngleDeg;
-        if (total == 1) {
-            baseAngleDeg = 0;
-        } else {
-            double start = -28.0;
-            double end = 28.0;
-            double step = (end - start) / (total - 1);
-            baseAngleDeg = start + index * step;
+        for (int i = 0; i < orbits.size(); i++) {
+            double angleDeg = distributeAngle(i, orbits.size(), 318, 42);
+            double[] point = findVisiblePointOnRotatedEllipse(centerX - 45, centerY + EARTH_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
+            addSatelliteVisuals(orbits.get(i), point[0], point[1], HEO_MARKER_COLOR, i, "highly_elliptical");
         }
-
-        double angle = Math.toRadians(baseAngleDeg);
-
-        double satX = ellipseCenterX + radiusX * Math.cos(angle);
-        double satY = ellipseCenterY + radiusY * Math.sin(angle);
-
-        mapPane.getChildren().add(ellipse);
-        addSatelliteVisuals(orbit, satX, satY, Color.MEDIUMPURPLE, index, "highly_elliptical");
-
-        orbitShapes.put(orbit.getId(), ellipse);
     }
 
-    private void drawPolarOrbit(Orbit orbit, int index, int total) {
-        PolarOrbit polar = orbitService.getPolarOrbitById(orbit.getId());
-        if (polar == null) {
+    private void addSatellitesToPolarOrbit(List<Orbit> orbits) {
+        if (orbits.isEmpty()) {
             return;
         }
 
-        double radiusX = earthRadius + 35 + index * 12.0;
-        double radiusY = earthRadius + 180 + index * 14.0;
-        double ellipseCenterX = centerX;
-        double ellipseCenterY = centerY;
+        double rx = earthRadius - 8;
+        double ry = earthRadius + 38;
+        double rotationDeg = 16;
 
-        Ellipse ellipse = new Ellipse(ellipseCenterX, ellipseCenterY, radiusX, radiusY);
-        ellipse.setFill(Color.TRANSPARENT);
-        ellipse.setStroke(Color.web("#8e8e8e"));
-        ellipse.setStrokeWidth(2);
-        ellipse.setMouseTransparent(true);
+        for (int i = 0; i < orbits.size(); i++) {
+            double angleDeg = distributeAngle(i, orbits.size(), 328, 24);
+            double[] point = findVisiblePointOnRotatedEllipse(centerX - 20, centerY + EARTH_VERTICAL_SHIFT - 15 + MAP_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
+            addSatelliteVisuals(orbits.get(i), point[0], point[1], POLAR_MARKER_COLOR, i, "polar");
+        }
+    }
 
-        double baseAngleDeg;
-        if (total == 1) {
-            baseAngleDeg = -90;
-        } else {
-            double start = -115.0;
-            double end = -65.0;
-            double step = (end - start) / (total - 1);
-            baseAngleDeg = start + index * step;
+    private double distributeAngle(int index, int total, double startDeg, double endDeg) {
+        if (total <= 1) {
+            if (startDeg <= endDeg) {
+                return (startDeg + endDeg) / 2.0;
+            }
+            double normalizedEnd = endDeg + 360.0;
+            return normalizeAngle((startDeg + normalizedEnd) / 2.0);
         }
 
-        double angle = Math.toRadians(baseAngleDeg);
+        if (startDeg <= endDeg) {
+            double step = (endDeg - startDeg) / (total - 1.0);
+            return startDeg + index * step;
+        }
 
-        double satX = ellipseCenterX + radiusX * Math.cos(angle);
-        double satY = ellipseCenterY + radiusY * Math.sin(angle);
+        double normalizedEnd = endDeg + 360.0;
+        double step = (normalizedEnd - startDeg) / (total - 1.0);
+        return normalizeAngle(startDeg + index * step);
+    }
 
-        mapPane.getChildren().add(ellipse);
-        addSatelliteVisuals(orbit, satX, satY, Color.FORESTGREEN, index, "polar");
-
-        orbitShapes.put(orbit.getId(), ellipse);
+    private double normalizeAngle(double angle) {
+        double result = angle % 360.0;
+        return result < 0 ? result + 360.0 : result;
     }
 
     private void addSatelliteVisuals(Orbit orbit, double x, double y, Color color, int index, String type) {
+        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 940;
+        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 700;
+
+        x = Math.max(32, Math.min(x, paneWidth - 32));
+        y = Math.max(32, Math.min(y, paneHeight - 32));
+
         Satellite satellite = satelliteService.getSatelliteById(orbit.getSatelliteId()).orElse(null);
         String satelliteName = satellite != null ? safe(satellite.getName()) : "Спутник-" + orbit.getSatelliteId();
+        String displayName = abbreviateLabel(satelliteName);
 
         Circle clickZone = new Circle(x, y, 22);
         clickZone.setFill(Color.TRANSPARENT);
@@ -328,7 +389,7 @@ public class OrbitMapView extends BorderPane {
         marker.setStrokeWidth(1.2);
         marker.setMouseTransparent(true);
 
-        Label label = new Label(satelliteName);
+        Label label = new Label(displayName);
         label.setStyle(
                 "-fx-font-size: 12px; " +
                         "-fx-font-weight: bold; " +
@@ -341,9 +402,11 @@ public class OrbitMapView extends BorderPane {
         label.applyCss();
         label.autosize();
 
-        double[] pos = calculateSimpleLabelPosition(x, y, label.getWidth(), label.getHeight(), index, type);
+        double[] basePos = calculateLabelPosition(x, y, label.getWidth(), label.getHeight(), index, type);
+        double[] pos = resolveLabelPositionWithoutOverlap(x, y, label.getWidth(), label.getHeight(), basePos[0], basePos[1]);
         label.setLayoutX(pos[0]);
         label.setLayoutY(pos[1]);
+        placedLabelBounds.add(new double[]{pos[0], pos[1], label.getWidth(), label.getHeight()});
 
         clickZone.setOnMouseClicked(event -> {
             selectedOrbit = orbitUiService.getFullOrbitById(orbit.getId());
@@ -353,7 +416,6 @@ public class OrbitMapView extends BorderPane {
             if (selectedOrbit != null) {
                 showSatelliteInfo(selectedOrbit);
             }
-            highlightOrbit(orbit);
         });
 
         clickZone.setOnMouseEntered(event -> marker.setRadius(11));
@@ -364,6 +426,43 @@ public class OrbitMapView extends BorderPane {
         });
 
         mapPane.getChildren().addAll(clickZone, marker);
+        placedMarkerCenters.add(new double[]{x, y});
+    }
+
+    private double[] calculateLabelPosition(double x, double y, double labelWidth, double labelHeight,
+                                            int index, String type) {
+        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 940;
+        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 700;
+
+        double labelX;
+        double labelY;
+
+        if ("geostationary".equals(type)) {
+            labelX = x + 16;
+            labelY = y - labelHeight / 2.0;
+        } else if ("highly_elliptical".equals(type)) {
+            labelX = x + 16;
+            labelY = y - labelHeight / 2.0;
+        } else {
+            labelX = (index % 2 == 0) ? x + 14 : x - labelWidth - 14;
+            labelY = y - labelHeight - 4;
+        }
+
+        if (labelX + labelWidth > paneWidth - 10) {
+            labelX = x - labelWidth - 14;
+        }
+        if (labelX < 10) {
+            labelX = x + 14;
+        }
+
+        if (labelY + labelHeight > paneHeight - 10) {
+            labelY = paneHeight - labelHeight - 10;
+        }
+        if (labelY < 10) {
+            labelY = 10;
+        }
+
+        return new double[]{labelX, labelY};
     }
 
     private void highlightMarker(Circle marker) {
@@ -394,6 +493,10 @@ public class OrbitMapView extends BorderPane {
                 }
             }
 
+            String operatorName = resolveOrganizationName(satellite.getOperatorOrganizationId());
+            String ownerName = resolveOrganizationName(satellite.getOwnerOrganizationId());
+            String manufacturerName = resolveOrganizationName(satellite.getManufacturerOrganizationId());
+
             List<CrossSatellitePayload> links = linkService.getLinksBySatelliteId(satellite.getId());
             List<Payload> payloads = new ArrayList<>();
 
@@ -404,6 +507,9 @@ public class OrbitMapView extends BorderPane {
             SatelliteDetailsDto dto = new SatelliteDetailsDto(
                     satellite,
                     seriesName,
+                    operatorName,
+                    ownerName,
+                    manufacturerName,
                     orbit.getOrbitType(),
                     payloads
             );
@@ -412,6 +518,23 @@ public class OrbitMapView extends BorderPane {
         } catch (Exception e) {
             showError("Ошибка загрузки информации о спутнике", e.getMessage());
         }
+    }
+
+    private String resolveOrganizationName(Integer organizationId) {
+        if (organizationId == null) {
+            return "-";
+        }
+
+        for (Organization organization : organizationService.getAll()) {
+            if (organization.getId() != null && organization.getId().equals(organizationId)) {
+                if (organization.getShortName() != null && !organization.getShortName().isBlank()) {
+                    return organization.getShortName();
+                }
+                return organization.getName() != null ? organization.getName() : "-";
+            }
+        }
+
+        return "-";
     }
 
     private void onAddOrbit() {
@@ -507,6 +630,23 @@ public class OrbitMapView extends BorderPane {
         }
     }
 
+    private void onManagePayloads() {
+        if (selectedSatellite == null || selectedSatellite.getId() == null) {
+            showWarning("Управление нагрузками", "Сначала выберите спутник на карте.");
+            return;
+        }
+
+        SatellitePayloadLinkDialog dialog = new SatellitePayloadLinkDialog(
+                selectedSatellite.getId(),
+                selectedSatellite.getName()
+        );
+        dialog.showAndWait();
+
+        if (selectedOrbit != null) {
+            showSatelliteInfo(selectedOrbit);
+        }
+    }
+
     private Satellite copySatellite(Satellite source) {
         Satellite copy = new Satellite();
         copy.setId(source.getId());
@@ -525,14 +665,8 @@ public class OrbitMapView extends BorderPane {
         copy.setManufacturerOrganizationId(source.getManufacturerOrganizationId());
         copy.setDescription(source.getDescription());
         copy.setNotes(source.getNotes());
+        copy.setPhoto(source.getPhoto());
         return copy;
-    }
-
-    private double normalizeLongitude(Double longitude) {
-        if (longitude == null) {
-            return 0;
-        }
-        return longitude - 90.0;
     }
 
     private void showError(String title, String message) {
@@ -551,74 +685,159 @@ public class OrbitMapView extends BorderPane {
         alert.showAndWait();
     }
 
+    private String abbreviateLabel(String value) {
+        if (value == null) {
+            return "-";
+        }
+        if (value.length() < 13) {
+            return value;
+        }
+        return value.substring(0, 13 - 3) + "...";
+    }
+
     private String safe(String value) {
         return value != null ? value : "-";
     }
 
-    private double[] calculateSimpleLabelPosition(double x, double y, double labelWidth, double labelHeight,
-                                                  int index, String type) {
-        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 900;
-        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 680;
+    private double[] pointOnRotatedEllipse(double cx, double cy, double rx, double ry,
+                                           double angleDeg, double rotationDeg) {
+        double angleRad = Math.toRadians(angleDeg);
+        double rotationRad = Math.toRadians(rotationDeg);
 
-        double labelX = x + 14;
-        double labelY = y - labelHeight - 4;
+        double localX = rx * Math.cos(angleRad);
+        double localY = ry * Math.sin(angleRad);
 
-        if ("polar".equals(type)) {
-            labelX = (index % 2 == 0) ? x + 14 : x - labelWidth - 14;
-            labelY = y - labelHeight / 2.0;
-        } else if ("highly_elliptical".equals(type)) {
-            labelX = x + 14;
-            labelY = y - labelHeight / 2.0;
-        } else if ("geostationary".equals(type)) {
-            labelX = x + 14;
-            labelY = y - labelHeight - 4;
-        }
+        double rotatedX = localX * Math.cos(rotationRad) - localY * Math.sin(rotationRad);
+        double rotatedY = localX * Math.sin(rotationRad) + localY * Math.cos(rotationRad);
 
-        if (labelX + labelWidth > paneWidth - 8) {
-            labelX = x - labelWidth - 14;
-        }
-        if (labelX < 8) {
-            labelX = x + 14;
-        }
-
-        if (labelY + labelHeight > paneHeight - 8) {
-            labelY = paneHeight - labelHeight - 8;
-        }
-        if (labelY < 8) {
-            labelY = 8;
-        }
-
-        return new double[]{labelX, labelY};
+        return new double[]{cx + rotatedX, cy + rotatedY};
     }
 
-    private void highlightOrbit(Orbit orbit) {
-        if (selectedOrbitShape != null) {
-            selectedOrbitShape.setStrokeWidth(2);
-            selectedOrbitShape.setStroke(Color.web("#8b8b8b"));
+    private double[] findVisiblePointOnRotatedEllipse(double cx, double cy, double rx, double ry,
+                                                      double preferredAngleDeg, double rotationDeg) {
+        double[] directPoint = pointOnRotatedEllipse(cx, cy, rx, ry, preferredAngleDeg, rotationDeg);
+        if (isHiddenBehindEarth(directPoint[0], directPoint[1])
+                && isTooCloseToExistingMarker(directPoint[0], directPoint[1])) {
+            return directPoint;
         }
 
-        Shape shape = orbitShapes.get(orbit.getId());
-        if (shape != null) {
-            shape.setStroke(Color.RED);
-            shape.setStrokeWidth(3);
-            selectedOrbitShape = shape;
+        double[] offsets = { -18, 18, -30, 30, -45, 45, -60, 60, -78, 78, -96, 96, -120, 120, 150, -150, 180 };
+        for (double offset : offsets) {
+            double candidateAngle = normalizeAngle(preferredAngleDeg + offset);
+            double[] candidatePoint = pointOnRotatedEllipse(cx, cy, rx, ry, candidateAngle, rotationDeg);
+            if (isHiddenBehindEarth(candidatePoint[0], candidatePoint[1])
+                    && isTooCloseToExistingMarker(candidatePoint[0], candidatePoint[1])) {
+                return candidatePoint;
+            }
         }
+
+        return directPoint;
     }
 
-    private void onManagePayloads() {
-        if (selectedSatellite == null || selectedSatellite.getId() == null) {
-            showWarning("Управление нагрузками", "Сначала выберите спутник на карте.");
-            return;
+    private boolean isHiddenBehindEarth(double x, double y) {
+        double earthCenterY = centerY + EARTH_VERTICAL_SHIFT + MAP_VERTICAL_SHIFT;
+        double dx = x - centerX;
+        double dy = y - earthCenterY;
+        double safeRadius = earthRadius + 18;
+
+        return !(dx * dx + dy * dy <= safeRadius * safeRadius);
+    }
+
+    private double[] pointOnEllipse(double cx, double cy, double rx, double ry, double angleDeg) {
+        double angleRad = Math.toRadians(angleDeg);
+        return new double[]{cx + rx * Math.cos(angleRad), cy + ry * Math.sin(angleRad)};
+    }
+
+    private double[] findVisiblePointOnEllipse(double cx, double cy, double rx, double ry, double preferredAngleDeg) {
+        double[] directPoint = pointOnEllipse(cx, cy, rx, ry, preferredAngleDeg);
+        if (isHiddenBehindEarth(directPoint[0], directPoint[1])
+                && isTooCloseToExistingMarker(directPoint[0], directPoint[1])) {
+            return directPoint;
         }
 
-        SatellitePayloadLinkDialog dialog = new SatellitePayloadLinkDialog(
-                selectedSatellite.getId(),
-                selectedSatellite.getName()
-        );
-        dialog.showAndWait();
-
-        if (selectedOrbit != null) {
-            showSatelliteInfo(selectedOrbit);
+        double[] offsets = { -18, 18, -30, 30, -45, 45, -60, 60, -78, 78, -96, 96, -120, 120, 150, -150, 180 };
+        for (double offset : offsets) {
+            double candidateAngle = normalizeAngle(preferredAngleDeg + offset);
+            double[] candidatePoint = pointOnEllipse(cx, cy, rx, ry, candidateAngle);
+            if (isHiddenBehindEarth(candidatePoint[0], candidatePoint[1])
+                    && isTooCloseToExistingMarker(candidatePoint[0], candidatePoint[1])) {
+                return candidatePoint;
+            }
         }
+
+        return directPoint;
+    }
+
+    private boolean isTooCloseToExistingMarker(double x, double y) {
+        double minDistance = 34.0;
+        for (double[] center : placedMarkerCenters) {
+            double dx = x - center[0];
+            double dy = y - center[1];
+            if (dx * dx + dy * dy < minDistance * minDistance) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private double[] resolveLabelPositionWithoutOverlap(double markerX, double markerY,
+                                                        double labelWidth, double labelHeight,
+                                                        double baseX, double baseY) {
+        double[][] candidates = new double[][] {
+                {baseX, baseY},
+                {markerX + 16, markerY - labelHeight / 2.0},
+                {markerX - labelWidth - 16, markerY - labelHeight / 2.0},
+                {markerX + 14, markerY - labelHeight - 8},
+                {markerX - labelWidth - 14, markerY - labelHeight - 8},
+                {markerX + 14, markerY + 10},
+                {markerX - labelWidth - 14, markerY + 10},
+                {markerX - labelWidth / 2.0, markerY - labelHeight - 14},
+                {markerX - labelWidth / 2.0, markerY + 12}
+        };
+
+        for (double[] candidate : candidates) {
+            double[] clamped = clampLabelPosition(candidate[0], candidate[1], labelWidth, labelHeight);
+            if (!intersectsExistingLabel(clamped[0], clamped[1], labelWidth, labelHeight)
+                    && !intersectsAnyMarker(clamped[0], clamped[1], labelWidth, labelHeight)) {
+                return clamped;
+            }
+        }
+
+        return clampLabelPosition(baseX, baseY, labelWidth, labelHeight);
+    }
+
+    private double[] clampLabelPosition(double x, double y, double labelWidth, double labelHeight) {
+        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 940;
+        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 700;
+
+        double clampedX = Math.max(10, Math.min(x, paneWidth - labelWidth - 10));
+        double clampedY = Math.max(10, Math.min(y, paneHeight - labelHeight - 10));
+        return new double[]{clampedX, clampedY};
+    }
+
+    private boolean intersectsExistingLabel(double x, double y, double width, double height) {
+        for (double[] bounds : placedLabelBounds) {
+            if (rectanglesIntersect(x, y, width, height, bounds[0], bounds[1], bounds[2], bounds[3])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean intersectsAnyMarker(double x, double y, double width, double height) {
+        double markerBoxSize = 22.0;
+        for (double[] center : placedMarkerCenters) {
+            double markerX = center[0] - markerBoxSize / 2.0;
+            double markerY = center[1] - markerBoxSize / 2.0;
+            if (rectanglesIntersect(x, y, width, height, markerX, markerY, markerBoxSize, markerBoxSize)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean rectanglesIntersect(double x1, double y1, double w1, double h1,
+                                        double x2, double y2, double w2, double h2) {
+        return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
     }
 }

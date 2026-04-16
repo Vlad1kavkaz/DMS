@@ -1,6 +1,7 @@
 package ru.vlad.satellitedb.model;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 
 public class Satellite {
 
@@ -20,6 +21,7 @@ public class Satellite {
     private Integer manufacturerOrganizationId;
     private String description;
     private String notes;
+    private byte[] photo;
 
     public Satellite() {
     }
@@ -150,5 +152,13 @@ public class Satellite {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public byte[] getPhoto() {
+        return photo != null ? Arrays.copyOf(photo, photo.length) : null;
+    }
+
+    public void setPhoto(byte[] photo) {
+        this.photo = photo != null ? Arrays.copyOf(photo, photo.length) : null;
     }
 }

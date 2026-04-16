@@ -474,3 +474,10 @@ CREATE INDEX IF NOT EXISTS ix_tb_cross_satellite_payload_ni_id_payload
 CREATE UNIQUE INDEX IF NOT EXISTS uix_tb_orbit_current_satellite
     ON sc_cogs.tb_orbit (ni_id_satellite)
     WHERE bl_is_current = TRUE;
+
+-- =========================================================
+-- PATCH: satellite photo
+-- =========================================================
+
+ALTER TABLE sc_cogs.tb_satellite
+    ADD COLUMN IF NOT EXISTS bt_photo BYTEA;

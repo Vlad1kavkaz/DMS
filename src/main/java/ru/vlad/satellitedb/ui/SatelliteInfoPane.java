@@ -3,15 +3,26 @@ package ru.vlad.satellitedb.ui;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Pane;
 import ru.vlad.satellitedb.model.Payload;
 import ru.vlad.satellitedb.model.Satellite;
+import ru.vlad.satellitedb.util.SatelliteImageUtil;
 
 public class SatelliteInfoPane extends VBox {
+
+    private final ImageView photoView = new ImageView();
+    private final Label photoPlaceholderLabel = new Label("Фотография отсутствует");
+    private final VBox photoBox = new VBox(8);
 
     private final Label nameLabel = new Label("Название: -");
     private final Label codeLabel = new Label("Код: -");
     private final Label seriesLabel = new Label("Серия: -");
+    private final Label operatorLabel = new Label("Оператор: -");
+    private final Label ownerLabel = new Label("Владелец: -");
+    private final Label manufacturerLabel = new Label("Производитель: -");
     private final Label statusLabel = new Label("Статус: -");
     private final Label purposeLabel = new Label("Назначение: -");
     private final Label orbitTypeLabel = new Label("Тип орбиты: -");
@@ -25,30 +36,110 @@ public class SatelliteInfoPane extends VBox {
 
     public SatelliteInfoPane() {
         setSpacing(10);
-        setPadding(new Insets(16));
-        setPrefWidth(320);
+        setPadding(new Insets(0, 16, 16, 16));
+        setPrefWidth(340);
+        setMinWidth(340);
+        setMaxWidth(340);
+        setPickOnBounds(false);
 
         Label titleLabel = new Label("Информация о спутнике");
         titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+
+        photoView.setFitWidth(300);
+        photoView.setFitHeight(180);
+        photoView.setPreserveRatio(true);
+        photoView.setSmooth(true);
+
+        photoPlaceholderLabel.setStyle("-fx-text-fill: #666666;");
+
+        nameLabel.setWrapText(true);
+        codeLabel.setWrapText(true);
+        seriesLabel.setWrapText(true);
+        operatorLabel.setWrapText(true);
+        ownerLabel.setWrapText(true);
+        manufacturerLabel.setWrapText(true);
+        statusLabel.setWrapText(true);
+        purposeLabel.setWrapText(true);
+        orbitTypeLabel.setWrapText(true);
+        launchDateLabel.setWrapText(true);
         payloadsLabel.setWrapText(true);
 
-        disableActions(true);
+        nameLabel.setMaxWidth(Double.MAX_VALUE);
+        codeLabel.setMaxWidth(Double.MAX_VALUE);
+        seriesLabel.setMaxWidth(Double.MAX_VALUE);
+        operatorLabel.setMaxWidth(Double.MAX_VALUE);
+        ownerLabel.setMaxWidth(Double.MAX_VALUE);
+        manufacturerLabel.setMaxWidth(Double.MAX_VALUE);
+        statusLabel.setMaxWidth(Double.MAX_VALUE);
+        purposeLabel.setMaxWidth(Double.MAX_VALUE);
+        orbitTypeLabel.setMaxWidth(Double.MAX_VALUE);
+        launchDateLabel.setMaxWidth(Double.MAX_VALUE);
+        payloadsLabel.setMaxWidth(Double.MAX_VALUE);
 
-        getChildren().addAll(
-                titleLabel,
-                nameLabel,
-                codeLabel,
-                seriesLabel,
-                statusLabel,
-                purposeLabel,
-                orbitTypeLabel,
-                launchDateLabel,
-                payloadsLabel,
+        photoBox.getChildren().setAll(photoView, photoPlaceholderLabel);
+
+        Pane buttonBox = new Pane();
+        buttonBox.setManaged(false);
+        buttonBox.setPickOnBounds(false);
+        buttonBox.setPrefHeight(46);
+        buttonBox.setMinHeight(46);
+        buttonBox.setMaxHeight(46);
+        buttonBox.setPrefWidth(1180);
+        buttonBox.setMinWidth(1180);
+        buttonBox.setMaxWidth(1180);
+
+        editSatelliteButton.setPrefWidth(165);
+        editSatelliteButton.setMinWidth(165);
+        editSatelliteButton.setMaxWidth(165);
+
+        managePayloadsButton.setPrefWidth(170);
+        managePayloadsButton.setMinWidth(170);
+        managePayloadsButton.setMaxWidth(170);
+
+        editOrbitButton.setPrefWidth(155);
+        editOrbitButton.setMinWidth(155);
+        editOrbitButton.setMaxWidth(155);
+
+        deleteOrbitButton.setPrefWidth(125);
+        deleteOrbitButton.setMinWidth(125);
+        deleteOrbitButton.setMaxWidth(125);
+
+        editSatelliteButton.relocate(0, 0);
+        managePayloadsButton.relocate(176, 0);
+        editOrbitButton.relocate(362, 0);
+        deleteOrbitButton.relocate(527, 0);
+
+        buttonBox.getChildren().addAll(
                 editSatelliteButton,
                 managePayloadsButton,
                 editOrbitButton,
                 deleteOrbitButton
         );
+
+        buttonBox.setLayoutX(-345);
+        buttonBox.layoutYProperty().bind(heightProperty().subtract(20));
+
+        disableActions(true);
+
+
+        getChildren().addAll(
+                titleLabel,
+                photoBox,
+                nameLabel,
+                codeLabel,
+                seriesLabel,
+                operatorLabel,
+                ownerLabel,
+                manufacturerLabel,
+                statusLabel,
+                purposeLabel,
+                orbitTypeLabel,
+                launchDateLabel,
+                payloadsLabel,
+                buttonBox
+        );
+
+        clearInfo();
     }
 
     public void setOnEditSatellite(Runnable action) {
@@ -84,9 +175,20 @@ public class SatelliteInfoPane extends VBox {
     }
 
     public void clearInfo() {
+        photoView.setImage(null);
+        photoView.setVisible(false);
+        photoView.setManaged(false);
+        photoPlaceholderLabel.setVisible(false);
+        photoPlaceholderLabel.setManaged(false);
+        photoBox.setVisible(false);
+        photoBox.setManaged(false);
+
         nameLabel.setText("Название: -");
         codeLabel.setText("Код: -");
         seriesLabel.setText("Серия: -");
+        operatorLabel.setText("Оператор: -");
+        ownerLabel.setText("Владелец: -");
+        manufacturerLabel.setText("Производитель: -");
         statusLabel.setText("Статус: -");
         purposeLabel.setText("Назначение: -");
         orbitTypeLabel.setText("Тип орбиты: -");
@@ -99,9 +201,14 @@ public class SatelliteInfoPane extends VBox {
     public void showInfo(SatelliteDetailsDto dto) {
         Satellite s = dto.getSatellite();
 
+        updatePhoto(s.getPhoto());
+
         nameLabel.setText("Название: " + safe(s.getName()));
         codeLabel.setText("Код: " + safe(s.getCode()));
         seriesLabel.setText("Серия: " + safe(dto.getSeriesName()));
+        operatorLabel.setText("Оператор: " + safe(dto.getOperatorName()));
+        ownerLabel.setText("Владелец: " + safe(dto.getOwnerName()));
+        manufacturerLabel.setText("Производитель: " + safe(dto.getManufacturerName()));
         statusLabel.setText("Статус: " + UiTextUtil.satelliteStatus(s.getStatus()));
         purposeLabel.setText("Назначение: " + UiTextUtil.satellitePurpose(s.getPurpose()));
         orbitTypeLabel.setText("Тип орбиты: " + UiTextUtil.orbitType(dto.getOrbitType()));
@@ -122,6 +229,21 @@ public class SatelliteInfoPane extends VBox {
         }
 
         disableActions(false);
+    }
+
+    private void updatePhoto(byte[] photoBytes) {
+        Image image = SatelliteImageUtil.toFxImage(photoBytes);
+        boolean hasPhoto = image != null;
+
+        photoView.setImage(image);
+        photoView.setVisible(hasPhoto);
+        photoView.setManaged(hasPhoto);
+
+        photoPlaceholderLabel.setVisible(false);
+        photoPlaceholderLabel.setManaged(false);
+
+        photoBox.setVisible(hasPhoto);
+        photoBox.setManaged(hasPhoto);
     }
 
     private void disableActions(boolean disabled) {
