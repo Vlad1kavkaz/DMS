@@ -120,8 +120,8 @@ public class OrbitMapView extends BorderPane {
         setCenter(mapPane);
         setRight(infoPane);
         BorderPane.setAlignment(infoPane, Pos.TOP_LEFT);
-        BorderPane.setMargin(infoPane, new Insets(0, 24, 0, 0));
-        infoPane.setTranslateX(-220);
+        BorderPane.setMargin(infoPane, new Insets(0, 32, 0, 0));
+        infoPane.setTranslateX(-250);
         infoPane.setTranslateY(-16);
 
         Platform.runLater(this::drawMap);
