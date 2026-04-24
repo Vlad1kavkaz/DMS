@@ -54,6 +54,16 @@ public class OrbitMapView extends BorderPane {
     private static final Color POLAR_MARKER_COLOR = Color.FORESTGREEN;
     private static final double EARTH_VERTICAL_SHIFT = -45;
     private static final double MAP_VERTICAL_SHIFT = 100;
+    private static final double MAP_ZOOM_FACTOR = 1.18;
+    private static final double MAP_CONTENT_SHIFT_X = 40;
+
+    private static final double BASE_MAP_SCALE = 0.8;
+    private static final double BASE_MAP_WIDTH = 940.0;
+    private static final double BASE_MAP_HEIGHT = 700.0;
+    private static final double MIN_MAP_RESPONSIVE_SCALE = 0.68;
+
+    private static final double TOOLBAR_SHIFT_X = 70;
+    private static final double TOOLBAR_SHIFT_Y = 20;
 
     private final SatelliteService satelliteService = new SatelliteService();
     private final OrbitService orbitService = new OrbitService();
@@ -63,6 +73,7 @@ public class OrbitMapView extends BorderPane {
     private final SatelliteSeriesService seriesService = new SatelliteSeriesService();
     private final OrganizationService organizationService = new OrganizationService();
 
+    private final Pane mapContainer = new Pane();
     private final Pane mapPane = new Pane();
     private final SatelliteInfoPane infoPane = new SatelliteInfoPane();
 
@@ -89,23 +100,35 @@ public class OrbitMapView extends BorderPane {
         addOrbitButton.setOnAction(e -> onAddOrbit());
 
         HBox toolbar = new HBox(10, refreshButton, addOrbitButton);
-        toolbar.setPadding(new Insets(8, 0, 12, 0));
+        toolbar.setTranslateX(TOOLBAR_SHIFT_X);
+        toolbar.setTranslateY(TOOLBAR_SHIFT_Y);
+        toolbar.setPadding(new Insets(8, 0, 32, 0));
 
         VBox topBox = new VBox(title, toolbar);
 
-        mapPane.setScaleX(0.8);
-        mapPane.setScaleY(0.8);
+        mapPane.setScaleX(BASE_MAP_SCALE);
+        mapPane.setScaleY(BASE_MAP_SCALE);
         mapPane.setTranslateX(-90);
         mapPane.setTranslateY(-55);
 
-        mapPane.setPrefSize(940, 700);
-        mapPane.setMinSize(820, 620);
+        mapPane.setPrefSize(BASE_MAP_WIDTH, BASE_MAP_HEIGHT);
+        mapPane.setMinSize(BASE_MAP_WIDTH, BASE_MAP_HEIGHT);
+        mapPane.setMaxSize(BASE_MAP_WIDTH, BASE_MAP_HEIGHT);
         mapPane.setStyle("-fx-background-color: #f4f4f4;");
 
-        Rectangle clip = new Rectangle();
-        clip.widthProperty().bind(mapPane.widthProperty());
-        clip.heightProperty().bind(mapPane.heightProperty());
-        mapPane.setClip(clip);
+        mapContainer.setMinSize(0, 0);
+        mapContainer.setStyle("-fx-background-color: #f4f4f4;");
+        mapContainer.getChildren().add(mapPane);
+
+        Rectangle mapPaneClip = new Rectangle();
+        mapPaneClip.widthProperty().bind(mapPane.widthProperty());
+        mapPaneClip.heightProperty().bind(mapPane.heightProperty());
+        mapPane.setClip(mapPaneClip);
+
+        Rectangle mapContainerClip = new Rectangle();
+        mapContainerClip.widthProperty().bind(mapContainer.widthProperty());
+        mapContainerClip.heightProperty().bind(mapContainer.heightProperty());
+        mapContainer.setClip(mapContainerClip);
 
         infoPane.setPrefWidth(320);
         infoPane.setMinWidth(320);
@@ -117,14 +140,41 @@ public class OrbitMapView extends BorderPane {
         infoPane.setOnDeleteOrbit(this::onDeleteOrbit);
 
         setTop(topBox);
-        setCenter(mapPane);
+        setCenter(mapContainer);
         setRight(infoPane);
         BorderPane.setAlignment(infoPane, Pos.TOP_LEFT);
         BorderPane.setMargin(infoPane, new Insets(0, 32, 0, 0));
-        infoPane.setTranslateX(-250);
+        infoPane.setTranslateX(-180);
         infoPane.setTranslateY(-16);
 
-        Platform.runLater(this::drawMap);
+        mapContainer.widthProperty().addListener((obs, oldValue, newValue) -> updateResponsiveMapScale());
+        mapContainer.heightProperty().addListener((obs, oldValue, newValue) -> updateResponsiveMapScale());
+
+        Platform.runLater(() -> {
+            updateResponsiveMapScale();
+            drawMap();
+        });
+    }
+
+    private void updateResponsiveMapScale() {
+        double availableWidth = mapContainer.getWidth();
+        double availableHeight = mapContainer.getHeight();
+
+        if (availableWidth <= 0 || availableHeight <= 0) {
+            return;
+        }
+
+        double responsiveScale = Math.min(
+                availableWidth / BASE_MAP_WIDTH,
+                availableHeight / BASE_MAP_HEIGHT
+        );
+
+        responsiveScale = Math.min(responsiveScale, 1.0);
+        responsiveScale = Math.max(responsiveScale, MIN_MAP_RESPONSIVE_SCALE);
+
+        double finalScale = BASE_MAP_SCALE * responsiveScale;
+        mapPane.setScaleX(finalScale);
+        mapPane.setScaleY(finalScale);
     }
 
     private void updateGeometry() {
@@ -132,16 +182,17 @@ public class OrbitMapView extends BorderPane {
         double height = mapPane.getHeight();
 
         if (width <= 0) {
-            width = 940;
+            width = BASE_MAP_WIDTH;
         }
+
         if (height <= 0) {
-            height = 700;
+            height = BASE_MAP_HEIGHT;
         }
 
         // Специально сдвигаем карту влево, чтобы справа было место под карточку
-        centerX = width * 0.35;
+        centerX = width * 0.35 + MAP_CONTENT_SHIFT_X;
         centerY = height * 0.49;
-        earthRadius = Math.min(width, height) * 0.14;
+        earthRadius = Math.min(width, height) * 0.14 * MAP_ZOOM_FACTOR;
     }
 
     private void drawMap() {
@@ -254,7 +305,12 @@ public class OrbitMapView extends BorderPane {
     }
 
     private Ellipse buildGeoOrbitEllipse() {
-        Ellipse ellipse = new Ellipse(centerX, centerY + MAP_VERTICAL_SHIFT, earthRadius + 185, earthRadius + 28);
+        Ellipse ellipse = new Ellipse(
+                centerX,
+                centerY + MAP_VERTICAL_SHIFT,
+                earthRadius + 185 * MAP_ZOOM_FACTOR,
+                earthRadius + 28 * MAP_ZOOM_FACTOR
+        );
         ellipse.setFill(Color.TRANSPARENT);
         ellipse.setStroke(ORBIT_COLOR);
         ellipse.setStrokeWidth(2.2);
@@ -263,7 +319,12 @@ public class OrbitMapView extends BorderPane {
     }
 
     private Ellipse buildHeoOrbitEllipse() {
-        Ellipse ellipse = new Ellipse(centerX - 45, centerY + EARTH_VERTICAL_SHIFT, earthRadius - 14, earthRadius + 105);
+        Ellipse ellipse = new Ellipse(
+                centerX - 45 * MAP_ZOOM_FACTOR,
+                centerY + EARTH_VERTICAL_SHIFT,
+                earthRadius - 14 * MAP_ZOOM_FACTOR,
+                earthRadius + 105 * MAP_ZOOM_FACTOR
+        );
         ellipse.setFill(Color.TRANSPARENT);
         ellipse.setStroke(ORBIT_COLOR);
         ellipse.setStrokeWidth(2.2);
@@ -273,7 +334,12 @@ public class OrbitMapView extends BorderPane {
     }
 
     private Ellipse buildPolarOrbitEllipse() {
-        Ellipse ellipse = new Ellipse(centerX - 20, centerY + EARTH_VERTICAL_SHIFT - 15 + MAP_VERTICAL_SHIFT, earthRadius - 8, earthRadius + 38);
+        Ellipse ellipse = new Ellipse(
+                centerX - 20 * MAP_ZOOM_FACTOR,
+                centerY + EARTH_VERTICAL_SHIFT - 15 * MAP_ZOOM_FACTOR + MAP_VERTICAL_SHIFT,
+                earthRadius - 8 * MAP_ZOOM_FACTOR,
+                earthRadius + 38 * MAP_ZOOM_FACTOR
+        );
         ellipse.setFill(Color.TRANSPARENT);
         ellipse.setStroke(ORBIT_COLOR);
         ellipse.setStrokeWidth(2.2);
@@ -320,13 +386,13 @@ public class OrbitMapView extends BorderPane {
             return;
         }
 
-        double rx = earthRadius - 14;
-        double ry = earthRadius + 105;
+        double rx = earthRadius - 14 * MAP_ZOOM_FACTOR;
+        double ry = earthRadius + 105 * MAP_ZOOM_FACTOR;
         double rotationDeg = -18;
 
         for (int i = 0; i < orbits.size(); i++) {
             double angleDeg = distributeAngle(i, orbits.size(), 318, 42);
-            double[] point = findVisiblePointOnRotatedEllipse(centerX - 45, centerY + EARTH_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
+            double[] point = findVisiblePointOnRotatedEllipse(centerX - 45 * MAP_ZOOM_FACTOR, centerY + EARTH_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
             addSatelliteVisuals(orbits.get(i), point[0], point[1], HEO_MARKER_COLOR, i, "highly_elliptical");
         }
     }
@@ -336,13 +402,13 @@ public class OrbitMapView extends BorderPane {
             return;
         }
 
-        double rx = earthRadius - 8;
-        double ry = earthRadius + 38;
+        double rx = earthRadius - 8 * MAP_ZOOM_FACTOR;
+        double ry = earthRadius + 38 * MAP_ZOOM_FACTOR;
         double rotationDeg = 16;
 
         for (int i = 0; i < orbits.size(); i++) {
             double angleDeg = distributeAngle(i, orbits.size(), 328, 24);
-            double[] point = findVisiblePointOnRotatedEllipse(centerX - 20, centerY + EARTH_VERTICAL_SHIFT - 15 + MAP_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
+            double[] point = findVisiblePointOnRotatedEllipse(centerX - 20 * MAP_ZOOM_FACTOR, centerY + EARTH_VERTICAL_SHIFT - 15 * MAP_ZOOM_FACTOR + MAP_VERTICAL_SHIFT, rx, ry, angleDeg, rotationDeg);
             addSatelliteVisuals(orbits.get(i), point[0], point[1], POLAR_MARKER_COLOR, i, "polar");
         }
     }
@@ -372,8 +438,8 @@ public class OrbitMapView extends BorderPane {
     }
 
     private void addSatelliteVisuals(Orbit orbit, double x, double y, Color color, int index, String type) {
-        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 940;
-        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 700;
+        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : BASE_MAP_WIDTH;
+        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : BASE_MAP_HEIGHT;
 
         x = Math.max(32, Math.min(x, paneWidth - 32));
         y = Math.max(32, Math.min(y, paneHeight - 32));
@@ -436,8 +502,8 @@ public class OrbitMapView extends BorderPane {
 
     private double[] calculateLabelPosition(double x, double y, double labelWidth, double labelHeight,
                                             int index, String type) {
-        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 940;
-        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 700;
+        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : BASE_MAP_WIDTH;
+        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : BASE_MAP_HEIGHT;
 
         double labelX;
         double labelY;
@@ -812,8 +878,8 @@ public class OrbitMapView extends BorderPane {
     }
 
     private double[] clampLabelPosition(double x, double y, double labelWidth, double labelHeight) {
-        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : 940;
-        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : 700;
+        double paneWidth = mapPane.getWidth() > 0 ? mapPane.getWidth() : BASE_MAP_WIDTH;
+        double paneHeight = mapPane.getHeight() > 0 ? mapPane.getHeight() : BASE_MAP_HEIGHT;
 
         double clampedX = Math.max(10, Math.min(x, paneWidth - labelWidth - 10));
         double clampedY = Math.max(10, Math.min(y, paneHeight - labelHeight - 10));
