@@ -7,19 +7,12 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Pane;
-import javafx.scene.transform.Scale;
 import ru.vlad.satellitedb.model.Payload;
 import ru.vlad.satellitedb.model.Satellite;
 import ru.vlad.satellitedb.util.SatelliteImageUtil;
 import ru.vlad.satellitedb.util.UiTextUtil;
 
 public class SatelliteInfoPane extends VBox {
-
-    private static final double BASE_WIDTH = 340.0;
-    private static final double BASE_HEIGHT = 700.0;
-    private static final double MIN_SCALE = 0.72;
-
-    private final Scale responsiveScale = new Scale(1.0, 1.0, 0.0, 0.0);
 
     private final ImageView photoView = new ImageView();
     private final Label photoPlaceholderLabel = new Label("Фотография отсутствует");
@@ -45,13 +38,10 @@ public class SatelliteInfoPane extends VBox {
     public SatelliteInfoPane() {
         setSpacing(10);
         setPadding(new Insets(0, 16, 16, 16));
-        setPrefWidth(BASE_WIDTH);
-        setMinWidth(BASE_WIDTH);
-        setMaxWidth(BASE_WIDTH);
+        setPrefWidth(340);
+        setMinWidth(340);
+        setMaxWidth(340);
         setPickOnBounds(false);
-        getTransforms().add(responsiveScale);
-        widthProperty().addListener((obs, oldValue, newValue) -> updateResponsiveScale());
-        heightProperty().addListener((obs, oldValue, newValue) -> updateResponsiveScale());
 
         Label titleLabel = new Label("Информация о спутнике");
         titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
@@ -127,8 +117,8 @@ public class SatelliteInfoPane extends VBox {
                 deleteOrbitButton
         );
 
-        buttonBox.setLayoutX(-275);
-        buttonBox.layoutYProperty().bind(heightProperty().subtract(10));
+        buttonBox.setLayoutX(-345);
+        buttonBox.layoutYProperty().bind(heightProperty().subtract(65));
 
         disableActions(true);
 
@@ -151,22 +141,6 @@ public class SatelliteInfoPane extends VBox {
         );
 
         clearInfo();
-    }
-
-    private void updateResponsiveScale() {
-        double availableWidth = getWidth();
-        double availableHeight = getHeight();
-
-        if (availableWidth <= 0 || availableHeight <= 0) {
-            return;
-        }
-
-        double scale = Math.min(availableWidth / BASE_WIDTH, availableHeight / BASE_HEIGHT);
-        scale = Math.min(scale, 1.0);
-        scale = Math.max(scale, MIN_SCALE);
-
-        responsiveScale.setX(scale);
-        responsiveScale.setY(scale);
     }
 
     public void setOnEditSatellite(Runnable action) {
