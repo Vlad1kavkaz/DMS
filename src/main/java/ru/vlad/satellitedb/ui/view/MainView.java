@@ -21,7 +21,11 @@ public class MainView {
                 "Спутники",
                 "Организации",
                 "Серии",
-                "Полезные нагрузки"
+                "Полезные нагрузки",
+                "Статусы спутников",
+                "Назначения спутников",
+                "Типы организаций",
+                "Типы полезной нагрузки"
         );
 
         root.setLeft(menu);
@@ -38,6 +42,10 @@ public class MainView {
                 case "Организации" -> root.setCenter(new OrganizationView());
                 case "Серии" -> root.setCenter(new SatelliteSeriesView());
                 case "Полезные нагрузки" -> root.setCenter(new PayloadView());
+                case "Статусы спутников" -> root.setCenter(new SatelliteStatusView());
+                case "Назначения спутников" -> root.setCenter(new SatellitePurposeView());
+                case "Типы организаций" -> root.setCenter(new OrganizationTypeView());
+                case "Типы полезной нагрузки" -> root.setCenter(new PayloadTypeView());
             }
         });
 

@@ -1,6 +1,5 @@
 package ru.vlad.satellitedb.ui.dialog;
 
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -18,7 +17,6 @@ import ru.vlad.satellitedb.model.CrossSatellitePayload;
 import ru.vlad.satellitedb.model.Payload;
 import ru.vlad.satellitedb.service.CrossSatellitePayloadService;
 import ru.vlad.satellitedb.service.PayloadService;
-import ru.vlad.satellitedb.ui.UiTextUtil;
 
 import java.util.HashMap;
 import java.util.List;
@@ -92,9 +90,6 @@ public class SatellitePayloadLinkDialog {
     }
 
     private void createColumns() {
-        TableColumn<CrossSatellitePayload, Integer> idCol = new TableColumn<>("ID");
-        idCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getId()));
-
         TableColumn<CrossSatellitePayload, String> payloadCol = new TableColumn<>("Полезная нагрузка");
         payloadCol.setCellValueFactory(data -> {
             Payload payload = payloadCache.get(data.getValue().getPayloadId());
@@ -105,7 +100,7 @@ public class SatellitePayloadLinkDialog {
         TableColumn<CrossSatellitePayload, String> typeCol = new TableColumn<>("Тип");
         typeCol.setCellValueFactory(data -> {
             Payload payload = payloadCache.get(data.getValue().getPayloadId());
-            String value = payload != null ? UiTextUtil.payloadType(payload.getType()) : "";
+            String value = payload != null ? nullSafe(payload.getType()) : "";
             return new ReadOnlyStringWrapper(value);
         });
 
@@ -117,7 +112,7 @@ public class SatellitePayloadLinkDialog {
         TableColumn<CrossSatellitePayload, String> notesCol = new TableColumn<>("Примечания");
         notesCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getNotes())));
 
-        table.getColumns().setAll(idCol, payloadCol, typeCol, primaryCol, notesCol);
+        table.getColumns().setAll(payloadCol, typeCol, primaryCol, notesCol);
     }
 
     private void loadPayloadCache() {

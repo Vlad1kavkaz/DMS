@@ -1,6 +1,5 @@
 package ru.vlad.satellitedb.ui.view;
 
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -14,7 +13,6 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import ru.vlad.satellitedb.model.Organization;
 import ru.vlad.satellitedb.service.OrganizationService;
-import ru.vlad.satellitedb.ui.UiTextUtil;
 import ru.vlad.satellitedb.ui.dialog.OrganizationFormDialog;
 
 import java.util.List;
@@ -55,9 +53,6 @@ public class OrganizationView extends BorderPane {
     }
 
     private void createColumns() {
-        TableColumn<Organization, Integer> idCol = new TableColumn<>("ID");
-        idCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getId()));
-
         TableColumn<Organization, String> nameCol = new TableColumn<>("Название");
         nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getName())));
 
@@ -66,7 +61,7 @@ public class OrganizationView extends BorderPane {
 
         TableColumn<Organization, String> typeCol = new TableColumn<>("Тип");
         typeCol.setCellValueFactory(data ->
-                new ReadOnlyStringWrapper(UiTextUtil.organizationType(data.getValue().getType()))
+                new ReadOnlyStringWrapper(nullSafe(data.getValue().getType()))
         );
 
         TableColumn<Organization, String> countryCol = new TableColumn<>("Страна");
@@ -75,7 +70,7 @@ public class OrganizationView extends BorderPane {
         TableColumn<Organization, String> websiteCol = new TableColumn<>("Сайт");
         websiteCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getWebsite())));
 
-        table.getColumns().addAll(idCol, nameCol, shortNameCol, typeCol, countryCol, websiteCol);
+        table.getColumns().addAll(nameCol, shortNameCol, typeCol, countryCol, websiteCol);
     }
 
     private void loadData() {

@@ -23,7 +23,7 @@ import ru.vlad.satellitedb.model.HeoOrbit;
 import ru.vlad.satellitedb.model.Orbit;
 import ru.vlad.satellitedb.model.PolarOrbit;
 import ru.vlad.satellitedb.model.Satellite;
-import ru.vlad.satellitedb.ui.UiTextUtil;
+import ru.vlad.satellitedb.util.UiTextUtil;
 
 import java.util.LinkedHashMap;
 import java.util.List;

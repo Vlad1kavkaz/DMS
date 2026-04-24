@@ -481,3 +481,110 @@ CREATE UNIQUE INDEX IF NOT EXISTS uix_tb_orbit_current_satellite
 
 ALTER TABLE sc_cogs.tb_satellite
     ADD COLUMN IF NOT EXISTS bt_photo BYTEA;
+
+-- =========================================================
+-- PATCH: satellite status dictionary
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS sc_cogs.tb_satellite_status (
+                                                           cv_satellite_status VARCHAR(50) NOT NULL,
+    ct_description TEXT,
+    dt_created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dt_updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_cv_satellite_status
+    PRIMARY KEY (cv_satellite_status)
+    );
+
+ALTER TABLE sc_cogs.tb_satellite
+DROP CONSTRAINT IF EXISTS cnc_cv_satellite_status;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_tb_satellite_status_tb_satellite_cv_satellite_status'
+          AND conrelid = 'sc_cogs.tb_satellite'::regclass
+    ) THEN
+ALTER TABLE sc_cogs.tb_satellite
+    ADD CONSTRAINT fk_tb_satellite_status_tb_satellite_cv_satellite_status
+        FOREIGN KEY (cv_satellite_status)
+            REFERENCES sc_cogs.tb_satellite_status (cv_satellite_status);
+END IF;
+END $$;
+
+-- =========================================================
+-- PATCH: satellite purpose dictionary
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS sc_cogs.tb_satellite_purpose (
+                                                            cv_satellite_purpose VARCHAR(50) NOT NULL,
+    ct_description TEXT,
+    dt_created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dt_updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_cv_satellite_purpose
+    PRIMARY KEY (cv_satellite_purpose)
+    );
+
+ALTER TABLE sc_cogs.tb_satellite
+DROP CONSTRAINT IF EXISTS cnc_cv_satellite_purpose;
+
+ALTER TABLE sc_cogs.tb_satellite
+DROP CONSTRAINT IF EXISTS fk_tb_satellite_purpose_tb_satellite_cv_satellite_purpose;
+
+ALTER TABLE sc_cogs.tb_satellite
+    ADD CONSTRAINT fk_tb_satellite_purpose_tb_satellite_cv_satellite_purpose
+        FOREIGN KEY (cv_satellite_purpose)
+            REFERENCES sc_cogs.tb_satellite_purpose (cv_satellite_purpose);
+
+-- =========================================================
+-- PATCH: organization type dictionary
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS sc_cogs.tb_organization_type (
+                                                            cv_organization_type VARCHAR(50) NOT NULL,
+    ct_description TEXT,
+    dt_created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dt_updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_cv_organization_type
+    PRIMARY KEY (cv_organization_type)
+    );
+
+ALTER TABLE sc_cogs.tb_organization
+DROP CONSTRAINT IF EXISTS cnc_cv_organization_type;
+
+ALTER TABLE sc_cogs.tb_organization
+DROP CONSTRAINT IF EXISTS fk_tb_organization_type_tb_organization_cv_organization_type;
+
+ALTER TABLE sc_cogs.tb_organization
+    ADD CONSTRAINT fk_tb_organization_type_tb_organization_cv_organization_type
+        FOREIGN KEY (cv_organization_type)
+            REFERENCES sc_cogs.tb_organization_type (cv_organization_type);
+
+-- =========================================================
+-- PATCH: payload type dictionary
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS sc_cogs.tb_payload_type (
+                                                       cv_payload_type VARCHAR(50) NOT NULL,
+    ct_description TEXT,
+    dt_created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dt_updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_cv_payload_type
+    PRIMARY KEY (cv_payload_type)
+    );
+
+ALTER TABLE sc_cogs.tb_payload
+DROP CONSTRAINT IF EXISTS cnc_cv_payload_type;
+
+ALTER TABLE sc_cogs.tb_payload
+DROP CONSTRAINT IF EXISTS fk_tb_payload_type_tb_payload_cv_payload_type;
+
+ALTER TABLE sc_cogs.tb_payload
+    ADD CONSTRAINT fk_tb_payload_type_tb_payload_cv_payload_type
+        FOREIGN KEY (cv_payload_type)
+            REFERENCES sc_cogs.tb_payload_type (cv_payload_type);

@@ -21,7 +21,6 @@ import ru.vlad.satellitedb.model.SatelliteSeries;
 import ru.vlad.satellitedb.service.OrganizationService;
 import ru.vlad.satellitedb.service.SatelliteSeriesService;
 import ru.vlad.satellitedb.service.SatelliteService;
-import ru.vlad.satellitedb.ui.UiTextUtil;
 import ru.vlad.satellitedb.ui.dialog.SatelliteFormDialog;
 import ru.vlad.satellitedb.util.SatelliteImageUtil;
 
@@ -106,9 +105,6 @@ public class SatelliteView extends BorderPane {
             }
         });
 
-        TableColumn<Satellite, Integer> idCol = new TableColumn<>("ID");
-        idCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getId()));
-
         TableColumn<Satellite, String> nameCol = new TableColumn<>("Название");
         nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getName())));
 
@@ -131,12 +127,12 @@ public class SatelliteView extends BorderPane {
 
         TableColumn<Satellite, String> purposeCol = new TableColumn<>("Назначение");
         purposeCol.setCellValueFactory(data ->
-                new ReadOnlyStringWrapper(UiTextUtil.satellitePurpose(data.getValue().getPurpose()))
+                new ReadOnlyStringWrapper(nullSafe(data.getValue().getPurpose()))
         );
 
         TableColumn<Satellite, String> statusCol = new TableColumn<>("Статус");
         statusCol.setCellValueFactory(data ->
-                new ReadOnlyStringWrapper(UiTextUtil.satelliteStatus(data.getValue().getStatus()))
+                new ReadOnlyStringWrapper(nullSafe(data.getValue().getStatus()))
         );
 
         TableColumn<Satellite, LocalDate> launchDateCol = new TableColumn<>("Дата запуска");
@@ -144,7 +140,6 @@ public class SatelliteView extends BorderPane {
 
         table.getColumns().addAll(
                 photoCol,
-                idCol,
                 nameCol,
                 codeCol,
                 seriesCol,

@@ -11,11 +11,11 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.util.StringConverter;
 import ru.vlad.satellitedb.model.Payload;
-import ru.vlad.satellitedb.ui.UiTextUtil;
+import ru.vlad.satellitedb.model.PayloadType;
+import ru.vlad.satellitedb.service.PayloadTypeService;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class PayloadFormDialog {
 
@@ -26,6 +26,7 @@ public class PayloadFormDialog {
     private final ComboBox<String> typeBox = new ComboBox<>();
     private final TextArea descriptionArea = new TextArea();
 
+    private final PayloadTypeService payloadTypeService = new PayloadTypeService();
     private final Payload payload;
 
     public PayloadFormDialog(Payload payload) {
@@ -81,24 +82,21 @@ public class PayloadFormDialog {
     }
 
     private void fillChoices() {
-        typeBox.getItems().addAll(
-                "radiometer",
-                "spectrometer",
-                "imager",
-                "radar",
-                "relay",
-                "scanner",
-                "other"
+        typeBox.getItems().setAll(
+                payloadTypeService.getAll().stream()
+                        .map(PayloadType::getType)
+                        .collect(Collectors.toList())
         );
+
         typeBox.setConverter(new StringConverter<>() {
             @Override
             public String toString(String value) {
-                return UiTextUtil.payloadType(value);
+                return value != null ? value : "";
             }
 
             @Override
             public String fromString(String string) {
-                return findKeyByValue(string, payloadTypeMap());
+                return string;
             }
         });
     }
@@ -116,27 +114,6 @@ public class PayloadFormDialog {
         payload.setType(typeBox.getValue());
         payload.setDescription(trimToNull(descriptionArea.getText()));
         return payload;
-    }
-
-    private Map<String, String> payloadTypeMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("radiometer", "Радиометр");
-        map.put("spectrometer", "Спектрометр");
-        map.put("imager", "Съёмочная аппаратура");
-        map.put("radar", "Радар");
-        map.put("relay", "Ретранслятор");
-        map.put("scanner", "Сканер");
-        map.put("other", "Другое");
-        return map;
-    }
-
-    private String findKeyByValue(String value, Map<String, String> map) {
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            if (entry.getValue().equals(value)) {
-                return entry.getKey();
-            }
-        }
-        return value;
     }
 
     private String trimToNull(String value) {

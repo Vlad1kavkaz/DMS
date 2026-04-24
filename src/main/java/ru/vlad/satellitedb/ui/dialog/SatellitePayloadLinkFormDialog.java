@@ -14,7 +14,6 @@ import javafx.scene.layout.GridPane;
 import javafx.util.StringConverter;
 import ru.vlad.satellitedb.model.CrossSatellitePayload;
 import ru.vlad.satellitedb.model.Payload;
-import ru.vlad.satellitedb.ui.UiTextUtil;
 
 import java.util.List;
 import java.util.Optional;
@@ -99,7 +98,7 @@ public class SatellitePayloadLinkFormDialog {
                     return "";
                 }
                 String name = payload.getName() != null ? payload.getName() : "-";
-                String type = payload.getType() != null ? UiTextUtil.payloadType(payload.getType()) : "-";
+                String type = payload.getType() != null ? payload.getType() : "-";
                 return name + " (" + type + ")";
             }
 

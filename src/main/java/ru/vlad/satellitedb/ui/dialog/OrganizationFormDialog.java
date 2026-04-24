@@ -10,11 +10,11 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.util.StringConverter;
 import ru.vlad.satellitedb.model.Organization;
-import ru.vlad.satellitedb.ui.UiTextUtil;
+import ru.vlad.satellitedb.model.OrganizationType;
+import ru.vlad.satellitedb.service.OrganizationTypeService;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class OrganizationFormDialog {
 
@@ -26,6 +26,7 @@ public class OrganizationFormDialog {
     private final TextField countryCodeField = new TextField();
     private final TextField websiteField = new TextField();
 
+    private final OrganizationTypeService organizationTypeService = new OrganizationTypeService();
     private final Organization organization;
 
     public OrganizationFormDialog(Organization organization) {
@@ -81,22 +82,21 @@ public class OrganizationFormDialog {
     }
 
     private void fillChoices() {
-        typeBox.getItems().addAll(
-                "operator",
-                "owner",
-                "manufacturer",
-                "agency",
-                "other"
+        typeBox.getItems().setAll(
+                organizationTypeService.getAll().stream()
+                        .map(OrganizationType::getType)
+                        .collect(Collectors.toList())
         );
+
         typeBox.setConverter(new StringConverter<>() {
             @Override
             public String toString(String value) {
-                return UiTextUtil.organizationType(value);
+                return value != null ? value : "";
             }
 
             @Override
             public String fromString(String string) {
-                return findKeyByValue(string, organizationTypeMap());
+                return string;
             }
         });
     }
@@ -116,25 +116,6 @@ public class OrganizationFormDialog {
         organization.setCountryCode(trimToNull(countryCodeField.getText()));
         organization.setWebsite(trimToNull(websiteField.getText()));
         return organization;
-    }
-
-    private Map<String, String> organizationTypeMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("operator", "Оператор");
-        map.put("owner", "Владелец");
-        map.put("manufacturer", "Производитель");
-        map.put("agency", "Агентство");
-        map.put("other", "Другое");
-        return map;
-    }
-
-    private String findKeyByValue(String value, Map<String, String> map) {
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            if (entry.getValue().equals(value)) {
-                return entry.getKey();
-            }
-        }
-        return value;
     }
 
     private String trimToNull(String value) {

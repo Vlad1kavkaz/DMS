@@ -1,6 +1,5 @@
 package ru.vlad.satellitedb.ui.view;
 
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -14,7 +13,6 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import ru.vlad.satellitedb.model.Payload;
 import ru.vlad.satellitedb.service.PayloadService;
-import ru.vlad.satellitedb.ui.UiTextUtil;
 import ru.vlad.satellitedb.ui.dialog.PayloadFormDialog;
 
 import java.util.List;
@@ -55,9 +53,6 @@ public class PayloadView extends BorderPane {
     }
 
     private void createColumns() {
-        TableColumn<Payload, Integer> idCol = new TableColumn<>("ID");
-        idCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getId()));
-
         TableColumn<Payload, String> codeCol = new TableColumn<>("Код");
         codeCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getCode())));
 
@@ -66,13 +61,13 @@ public class PayloadView extends BorderPane {
 
         TableColumn<Payload, String> typeCol = new TableColumn<>("Тип");
         typeCol.setCellValueFactory(data ->
-                new ReadOnlyStringWrapper(UiTextUtil.payloadType(data.getValue().getType()))
+                new ReadOnlyStringWrapper(nullSafe(data.getValue().getType()))
         );
 
         TableColumn<Payload, String> descriptionCol = new TableColumn<>("Описание");
         descriptionCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getDescription())));
 
-        table.getColumns().addAll(idCol, codeCol, nameCol, typeCol, descriptionCol);
+        table.getColumns().addAll(codeCol, nameCol, typeCol, descriptionCol);
     }
 
     private void loadData() {

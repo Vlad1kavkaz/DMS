@@ -20,16 +20,17 @@ import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
 import ru.vlad.satellitedb.model.Organization;
 import ru.vlad.satellitedb.model.Satellite;
+import ru.vlad.satellitedb.model.SatellitePurpose;
 import ru.vlad.satellitedb.model.SatelliteSeries;
+import ru.vlad.satellitedb.model.SatelliteStatus;
 import ru.vlad.satellitedb.service.OrganizationService;
+import ru.vlad.satellitedb.service.SatellitePurposeService;
 import ru.vlad.satellitedb.service.SatelliteSeriesService;
-import ru.vlad.satellitedb.ui.UiTextUtil;
+import ru.vlad.satellitedb.service.SatelliteStatusService;
 import ru.vlad.satellitedb.util.SatelliteImageUtil;
 
 import java.io.File;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -59,6 +60,8 @@ public class SatelliteFormDialog {
 
     private final SatelliteSeriesService seriesService = new SatelliteSeriesService();
     private final OrganizationService organizationService = new OrganizationService();
+    private final SatelliteStatusService satelliteStatusService = new SatelliteStatusService();
+    private final SatellitePurposeService satellitePurposeService = new SatellitePurposeService();
     private final Satellite satellite;
 
     public SatelliteFormDialog(Satellite satellite) {
@@ -202,15 +205,9 @@ public class SatelliteFormDialog {
     private void initOrganizationBoxes() {
         List<Organization> allOrganizations = organizationService.getAll();
 
-        operatorBox.setItems(FXCollections.observableArrayList(
-                filterOrganizations(allOrganizations, "operator", "agency", "other")
-        ));
-        ownerBox.setItems(FXCollections.observableArrayList(
-                filterOrganizations(allOrganizations, "owner", "agency", "other")
-        ));
-        manufacturerBox.setItems(FXCollections.observableArrayList(
-                filterOrganizations(allOrganizations, "manufacturer", "agency", "other")
-        ));
+        operatorBox.setItems(FXCollections.observableArrayList(allOrganizations));
+        ownerBox.setItems(FXCollections.observableArrayList(allOrganizations));
+        manufacturerBox.setItems(FXCollections.observableArrayList(allOrganizations));
 
         StringConverter<Organization> converter = new StringConverter<>() {
             @Override
@@ -235,56 +232,46 @@ public class SatelliteFormDialog {
         manufacturerBox.setConverter(converter);
     }
 
-    private List<Organization> filterOrganizations(List<Organization> organizations, String... allowedTypes) {
-        List<String> allowed = List.of(allowedTypes);
-        return organizations.stream()
-                .filter(org -> org.getType() != null && allowed.contains(org.getType()))
-                .collect(Collectors.toList());
-    }
-
     private void initPurposeBox() {
-        purposeBox.getItems().addAll(
-                "meteorology",
-                "hydrology",
-                "remote_sensing",
-                "climate_monitoring",
-                "ocean_monitoring",
-                "ice_monitoring",
-                "environment_monitoring",
-                "multi_purpose",
-                "other"
+        List<SatellitePurpose> purposes = satellitePurposeService.getAll();
+
+        purposeBox.getItems().setAll(
+                purposes.stream()
+                        .map(SatellitePurpose::getPurpose)
+                        .collect(Collectors.toList())
         );
+
         purposeBox.setConverter(new StringConverter<>() {
             @Override
             public String toString(String value) {
-                return UiTextUtil.satellitePurpose(value);
+                return value != null ? value : "";
             }
 
             @Override
             public String fromString(String string) {
-                return findKeyByValue(string, satellitePurposeMap());
+                return string;
             }
         });
     }
 
     private void initStatusBox() {
-        statusBox.getItems().addAll(
-                "planned",
-                "active",
-                "reserve",
-                "inactive",
-                "lost",
-                "retired"
+        List<SatelliteStatus> statuses = satelliteStatusService.getAll();
+
+        statusBox.getItems().setAll(
+                statuses.stream()
+                        .map(SatelliteStatus::getStatus)
+                        .collect(Collectors.toList())
         );
+
         statusBox.setConverter(new StringConverter<>() {
             @Override
             public String toString(String value) {
-                return UiTextUtil.satelliteStatus(value);
+                return value != null ? value : "";
             }
 
             @Override
             public String fromString(String string) {
-                return findKeyByValue(string, satelliteStatusMap());
+                return string;
             }
         });
     }
@@ -394,40 +381,6 @@ public class SatelliteFormDialog {
         satellite.setDescription(trimToNull(descriptionArea.getText()));
         satellite.setNotes(trimToNull(notesArea.getText()));
         return satellite;
-    }
-
-    private Map<String, String> satellitePurposeMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("meteorology", "Метеорология");
-        map.put("hydrology", "Гидрология");
-        map.put("remote_sensing", "Дистанционное зондирование");
-        map.put("climate_monitoring", "Климатический мониторинг");
-        map.put("ocean_monitoring", "Мониторинг океана");
-        map.put("ice_monitoring", "Мониторинг ледовой обстановки");
-        map.put("environment_monitoring", "Экологический мониторинг");
-        map.put("multi_purpose", "Многоцелевой");
-        map.put("other", "Другое");
-        return map;
-    }
-
-    private Map<String, String> satelliteStatusMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("planned", "Планируется");
-        map.put("active", "Активен");
-        map.put("reserve", "Резервный");
-        map.put("inactive", "Неактивен");
-        map.put("lost", "Потерян");
-        map.put("retired", "Выведен из эксплуатации");
-        return map;
-    }
-
-    private String findKeyByValue(String value, Map<String, String> map) {
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            if (entry.getValue().equals(value)) {
-                return entry.getKey();
-            }
-        }
-        return value;
     }
 
     private String trimToNull(String value) {

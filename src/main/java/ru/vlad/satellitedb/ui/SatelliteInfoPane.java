@@ -10,6 +10,7 @@ import javafx.scene.layout.Pane;
 import ru.vlad.satellitedb.model.Payload;
 import ru.vlad.satellitedb.model.Satellite;
 import ru.vlad.satellitedb.util.SatelliteImageUtil;
+import ru.vlad.satellitedb.util.UiTextUtil;
 
 public class SatelliteInfoPane extends VBox {
 
@@ -209,8 +210,8 @@ public class SatelliteInfoPane extends VBox {
         operatorLabel.setText("Оператор: " + safe(dto.getOperatorName()));
         ownerLabel.setText("Владелец: " + safe(dto.getOwnerName()));
         manufacturerLabel.setText("Производитель: " + safe(dto.getManufacturerName()));
-        statusLabel.setText("Статус: " + UiTextUtil.satelliteStatus(s.getStatus()));
-        purposeLabel.setText("Назначение: " + UiTextUtil.satellitePurpose(s.getPurpose()));
+        statusLabel.setText("Статус: " + safe(s.getStatus()));
+        purposeLabel.setText("Назначение: " + safe(s.getPurpose()));
         orbitTypeLabel.setText("Тип орбиты: " + UiTextUtil.orbitType(dto.getOrbitType()));
         launchDateLabel.setText("Дата запуска: " + (s.getLaunchDate() != null ? s.getLaunchDate().toString() : "-"));
 
@@ -221,7 +222,7 @@ public class SatelliteInfoPane extends VBox {
             for (Payload p : dto.getPayloads()) {
                 sb.append("• ").append(safe(p.getName()));
                 if (p.getType() != null && !p.getType().isBlank()) {
-                    sb.append(" (").append(UiTextUtil.payloadType(p.getType())).append(")");
+                    sb.append(" (").append(p.getType()).append(")");
                 }
                 sb.append("\n");
             }

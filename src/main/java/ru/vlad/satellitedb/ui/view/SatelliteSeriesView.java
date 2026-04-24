@@ -1,6 +1,5 @@
 package ru.vlad.satellitedb.ui.view;
 
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -54,9 +53,6 @@ public class SatelliteSeriesView extends BorderPane {
     }
 
     private void createColumns() {
-        TableColumn<SatelliteSeries, Integer> idCol = new TableColumn<>("ID");
-        idCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().getId()));
-
         TableColumn<SatelliteSeries, String> codeCol = new TableColumn<>("Код");
         codeCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getCode())));
 
@@ -66,7 +62,7 @@ public class SatelliteSeriesView extends BorderPane {
         TableColumn<SatelliteSeries, String> descriptionCol = new TableColumn<>("Описание");
         descriptionCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(nullSafe(data.getValue().getDescription())));
 
-        table.getColumns().addAll(idCol, codeCol, nameCol, descriptionCol);
+        table.getColumns().addAll(codeCol, nameCol, descriptionCol);
     }
 
     private void loadData() {
